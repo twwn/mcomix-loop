@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "defaultMode": "auto",
+    "additionalDirectories": [
+      "~/.claude/skills/mcomix-loop/state"
+    ],
+    "deny": [
+      "Edit(~/.config/mcomix/**)",
+      "Edit(~/.local/share/mcomix/**)",
+      "Edit(~/.local/share/recently-used.xbel)"
+    ]
+  },
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "300000"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "worktree": {
+    "baseRef": "head"
+  }
+}
