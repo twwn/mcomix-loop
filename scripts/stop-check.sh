@@ -19,13 +19,28 @@ else
     active=$(printf '%s' "$input" | python3 -c 'import json,sys; print(str(json.load(sys.stdin).get("stop_hook_active", False)).lower())' 2>/dev/null)
 fi
 [ "$active" = true ] && exit 0
+
+# The bundle must stay readable: a concept with broken frontmatter drops out
+# of every listing, and a ruling without one is not injected at all.
+problems=$($OKF check 2>/dev/null)
+if [ -n "$problems" ]; then
+    n=$(cat "$SCRATCH/okf-blocks" 2>/dev/null || echo 0)
+    if [ "$n" -lt 2 ]; then
+        mkdir -p "$SCRATCH"; echo $((n + 1)) > "$SCRATCH/okf-blocks"
+        printf 'mcomix-loop: the knowledge bundle has problems; fix them before ending the turn:\n%s\n' "$problems" >&2
+        exit 2
+    fi
+else
+    rm -f "$SCRATCH/okf-blocks"
+fi
+
 [ -e "$STAMP" ] || exit 0                       # no gate run this iteration: nothing to check
 
 if [ ! -e "$NOTES" ] || [ "$STAMP" -nt "$NOTES" ]; then
     n=$(cat "$COUNTER" 2>/dev/null || echo 0)
     [ "$n" -ge 2 ] && exit 0                    # already blocked twice for this gate run; let it end
     echo $((n + 1)) > "$COUNTER"
-    echo "mcomix-loop: the gates ran after LOOP_NOTES was last written. Rewrite $NOTES (all sections, gate numbers as of the commit you measured), append to LOOP_TECHNIQUES if anything proved itself, then ScheduleWakeup." >&2
+    echo "mcomix-loop: the gates ran after LOOP_NOTES was last written. Rewrite $NOTES (all sections, gate numbers as of the commit you measured), add to LOOP_TECHNIQUES or REJECTED what proved itself, then ScheduleWakeup." >&2
     exit 2
 fi
 rm -f "$COUNTER"

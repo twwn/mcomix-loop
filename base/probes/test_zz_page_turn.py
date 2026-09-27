@@ -5,7 +5,9 @@
 # every page is extracted, then turns 30 pages one at a time, each
 # drawn before the next, and prints the median wall time per turn and
 # the top of a cProfile of the whole run by cumulative time.
-# PROFILE=0 skips the profile (for timing alone). Delete afterwards.
+# PROFILE=0 skips the profile (for timing alone). OPTS=a,b turns on
+# options first: smartbg, enhance (brightness 1.1), rot90, double,
+# thumbs (smart thumb bg), manual (manga mode). Delete afterwards.
 import cProfile
 import io
 import os
@@ -17,7 +19,7 @@ from . import MComixTest, pump, wait_for
 
 from mcomix import constants, icons, main
 
-BOOK = '~/.claude/skills/mcomix-loop/state/probes/big60.cbz'
+BOOK = os.path.expanduser('~/.claude/skills/mcomix-loop/state/probes/big60.cbz')
 
 
 class PageTurn(MComixTest):
@@ -36,6 +38,22 @@ class PageTurn(MComixTest):
             wait_for(lambda: handler.get_number_of_pages() == 60, seconds=20)
             wait_for(lambda: all(handler.page_is_available(n)
                                  for n in range(1, 61)), seconds=30)
+            pump()
+            from mcomix.preferences import prefs
+            opts = os.environ.get('OPTS', '').split(',')
+            if 'smartbg' in opts:
+                prefs['smart bg'] = True
+            if 'enhance' in opts:
+                window.enhancer.brightness = 1.1
+            if 'rot90' in opts:
+                prefs['rotation'] = 90
+            if 'double' in opts:
+                window.actiongroup.get_action('double_page').set_active(True)
+            if 'thumbs' in opts:
+                prefs['smart thumb bg'] = True
+            if 'manual' in opts:
+                window.actiongroup.get_action('manga_mode').set_active(True)
+            window.draw_image()
             pump()
             times = []
             profiling = os.environ.get('PROFILE', '1') == '1'

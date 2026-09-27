@@ -1,0 +1,14 @@
+---
+type: Technique
+title: The recently-used list in a probe
+tags: [gtk]
+sources:
+  - { resource: "repo:test/test_recent.py" }
+  - { resource: "repo:test/__init__.py" }
+generated: { by: mcomix-loop/claude, at: "2026-09-24T16:42:50+02:00" }
+---
+
+- **`Gtk.RecentManager.add_item()` records nothing without a program name.**  It fills the entry's application name from `g_get_prgname()`, and a bare script or the test harness has none, so GTK prints "no name of the application that is registering it was defined" and drops the entry; `add_item()` still returns True. `run.py` calls `GLib.set_prgname(constants.APPNAME)`, which is why the real program's Recent list works.  A probe that wants MComix' own `RecentFilesMenu.add_path()` to land calls `GLib.set_prgname('mcomix')` before anything else; tests use `add_full()` with a `Gtk.RecentData` instead, as `test/test_recent.py` does.  Redirect the manager too (`Gtk.RecentManager(filename=<temp>)` behind a patched `get_default`), and turn `gtk-recent-files-enabled` on and `gtk-recent-files-max-age` up on `Gtk.Settings`, since a bare X server defaults to keeping nothing.
+- **The store and the program name are the harness's now** (1dbe0a91, add07972). `test/__init__.py` sets `GLib.set_prgname(APPNAME)` at import, as run.py does, and hands every test one `Gtk.RecentManager` in the session's temporary directory behind a patched `get_default`, purged in `setUp`. Before that, the default manager was built inside whichever test opened a window first and went on writing into that removed directory - 333 "no name of the application" warnings and about 20 "Attempting to store changes" warnings per run, plus a rare `OSError: [Errno 39] Directory not empty` when a write landed inside another test's `shutil.rmtree`.
+- **The suite does not reach the reader's own list** (checked at 917cf8fe): GLib resolves `XDG_DATA_HOME` when the default manager is built, and `MComixTest` sets that variable before any window exists, so the entries land in the test's temporary home. Proved by setting `HOME` and `XDG_DATA_HOME` before importing `gi`, calling `add_full()`, and running a main loop until `<temp>/data/recently-used.xbel` appears - it takes a second or two, because GTK batches the write, so a probe that checks straight away sees nothing and concludes the opposite. The manager is a singleton for the process, so every later test in a worker writes into the first test's temporary home, which is gone by then; GTK swallows that.
+- **Gtk.RecentManager.add_item() files the entry later** (at 0fa21d74): it asks for the file's type first and files the entry when that answer comes back through the main loop, so one pump is not always enough; a test that read the list after it failed 63 of 108 runs as 24 copies under load. add_full() with a Gtk.RecentData files it before returning. add_item() also normalises the URI it is given (GLib's form), remove_item() does not.

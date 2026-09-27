@@ -3,12 +3,15 @@
 #   REPO      the MComix checkout = the directory `claude` was started in
 #             (hooks get it as $CLAUDE_PROJECT_DIR or the hook input's cwd;
 #             tool commands get it as $PWD). Verified by fingerprint.
-#   STATE     $SKILL_DIR/state — the loop's memory, kept beside the skill so
-#             it survives a reboot and moves with the skill. Never shipped
-#             with the bundle, so a reinstall does not touch it.
-#   NOTES     $STATE/notes.md        (LOOP_NOTES)
-#   TECHNIQUES $STATE/techniques.md  (LOOP_TECHNIQUES)
-#   SCRATCH   $STATE/scratch         gate logs, exports, iteration.md
+#   STATE     $SKILL_DIR/state — the loop's memory, an Open Knowledge Format
+#             (OKF 0.2) bundle kept beside the skill (scripts/okf.py reads and
+#             checks it). Gitignored, so a reinstall does not touch it.
+#   NOTES      $STATE/notes.md         LOOP_NOTES, rewritten every iteration
+#   TECHNIQUES $STATE/techniques/      LOOP_TECHNIQUES, one concept per file
+#   DECISIONS  $STATE/decisions/       the user's rulings, one file each; never edited by the loop
+#   REJECTED   $STATE/rejected.md      what was examined and left alone
+#   COMMITS    $STATE/commits.log      parent and subject of each commit the loop made (guard.sh)
+#   SCRATCH    $STATE/scratch          gate logs, exports, iteration.txt; not part of the bundle
 #   CAMPAIGN  $REPO/.claude/worktrees/campaign — inside the project directory,
 #             next to where the harness puts subagent worktrees, so no extra
 #             permission scope is needed; .claude/ must be in .git/info/exclude.
@@ -19,8 +22,12 @@
 SKILL_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 STATE=$SKILL_DIR/state
 NOTES=$STATE/notes.md
-TECHNIQUES=$STATE/techniques.md
+TECHNIQUES=$STATE/techniques
+DECISIONS=$STATE/decisions
+REJECTED=$STATE/rejected.md
+COMMITS=$STATE/commits.log
 SCRATCH=$STATE/scratch
+OKF="python3 $SKILL_DIR/scripts/okf.py"
 
 # Per-installation settings, overridable in $STATE/config.sh (see
 # config.example.sh at the top level; the guard treats that file as the

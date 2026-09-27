@@ -42,15 +42,22 @@ case "$tool" in
     Write|Edit)
         path=$(json tool_input.file_path)
         case "$path" in
-            "$TECHNIQUES")
-                [ "$tool" = Write ] && deny "LOOP_TECHNIQUES is append-only: use Edit, or 'cat >>' in Bash, never Write." ;;
-            "$STATE"/config.sh|"$STATE"/project.md)
+            "$STATE"/index.md|"$TECHNIQUES"/index.md|"$DECISIONS"/index.md)
+                deny "index.md is generated from the concepts' frontmatter (okf.py index, run by state.sh); edit the concept instead." ;;
+            "$TECHNIQUES"/*.md|"$REJECTED")
+                [ "$tool" = Write ] && [ -e "$path" ] \
+                    && deny "${path##*/} exists: add to it or correct it in place with Edit; never overwrite a concept. A new technique is a new file." ;;
+            "$DECISIONS"/*)
+                deny "a ruling is recorded with okf.py ruling (a new file) and never edited: a changed ruling is a new one naming the date of the one it replaces." ;;
+            "$STATE"/config.sh|"$STATE"/project.md|"$COMMITS")
                 deny "$path is the user's: settings and installation facts. Record what is wrong under 'Prompt corrections' in LOOP_NOTES." ;;
             "$STATE"/*) ;;
             "$SKILL_DIR"/*|*/.claude/commands/mcomix-loop.md)
                 deny "the loop does not edit its own prompt or scripts; record the correction under 'Prompt corrections' in LOOP_NOTES." ;;
             "$HOME"/.config/mcomix*|"$HOME"/.local/share/mcomix*|*/recently-used.xbel)
                 deny "real user data; every probe builds on test/__init__.py:MComixTest." ;;
+            "$HOME"/.claude/projects/*/memory/*)
+                deny "Claude Code's auto memory is not this loop's memory: a ruling goes to $DECISIONS, a technique to $TECHNIQUES, a dead end to $REJECTED." ;;
         esac
         for f in ${FOREIGN[@]+"${FOREIGN[@]}"}; do
             case "$path" in "$f"|"$f"/*) deny "$f belongs to another session." ;; esac
@@ -62,6 +69,7 @@ esac
 
 # ------------------------------------------------------------ shell commands
 cmd=$(json tool_input.command)
+raw_cmd=$cmd
 [ -z "$cmd" ] && exit 0
 bg=$(json tool_input.run_in_background)
 [ "$bg" = true ] && deny "no background commands in the loop: a hang must surface as a timeout, not vanish into a background task."
@@ -80,6 +88,10 @@ cmd=$(printf '%s\n' "$cmd" | awk '
     { line = $0; sub(/^\t+/, "", line); if (line == body) body = "" }
 ')
 flat=$(printf '%s' "$cmd" | tr '\n\t' '  ' | tr -s ' ')
+# A quoted -m/--message argument with a space in it is a message, not a
+# command: blank it, so "xvfb-run" or "(a; b)" in a subject does not read as
+# a command. (A module name after python's -m has no space, and stays.)
+flat=$(printf '%s' "$flat" | sed -E "s/(-m|--message)(=|[[:space:]]+)(\"[^\"]* [^\"]*\"|'[^']* [^']*')/\1 MSG/g")
 
 for f in ${FOREIGN[@]+"${FOREIGN[@]}"}; do
     case "$flat" in *"$f"*) deny "$f belongs to another session." ;; esac
@@ -94,18 +106,24 @@ esac
 
 # Rules below run per command segment, not over the whole string: a single
 # command that appends to LOOP_TECHNIQUES and also runs `sed -i` on a source
-# file, or that folds iteration.md into LOOP_NOTES and then deletes
-# iteration.md, is two separate acts and only the wrong one is refused.
+# file, or that folds iteration.txt into LOOP_NOTES and then deletes
+# iteration.txt, is two separate acts and only the wrong one is refused.
 
-check_techniques() {   # $1: one segment that names LOOP_TECHNIQUES
-    printf '%s' "$1" | grep -Eq "(^|[^>])>[[:space:]]*$TECHNIQUES" \
-        && deny "LOOP_TECHNIQUES is append-only; use '>>'."
-    printf '%s' "$1" | grep -Eq '(^|[ ;&|(])(sed|perl)[[:space:]]+-[A-Za-z]*i|(^|[ ;&|(])truncate[[:space:]]' \
-        && deny "LOOP_TECHNIQUES is append-only; no in-place edits or truncation."
-    if printf '%s' "$1" | grep -Eq '(^|[ ;&|(])tee[[:space:]]' \
-       && ! printf '%s' "$1" | grep -Eq 'tee[[:space:]]+(-[^ ]+[[:space:]]+)*(-a|--append)'; then
-        deny "LOOP_TECHNIQUES is append-only; 'tee' needs -a."
+check_appendonly() {   # $1: one segment, $2: an append-only file it names
+    local seg=$1 f=$2 name=${2##*/}
+    printf '%s' "$seg" | grep -Eq "(^|[^>])>[[:space:]]*$f" \
+        && deny "$name is append-only; use '>>'."
+    printf '%s' "$seg" | grep -Eq '(^|[ ;&|(])(sed|perl)[[:space:]]+-[A-Za-z]*i|(^|[ ;&|(])truncate[[:space:]]' \
+        && deny "$name is append-only; no in-place edits or truncation."
+    if printf '%s' "$seg" | grep -Eq '(^|[ ;&|(])tee[[:space:]]' \
+       && ! printf '%s' "$seg" | grep -Eq 'tee[[:space:]]+(-[^ ]+[[:space:]]+)*(-a|--append)'; then
+        deny "$name is append-only; 'tee' needs -a."
     fi
+    # shellcheck disable=SC2206
+    local t=($seg)
+    case "${t[0]}" in
+        cp|mv|install|*/cp|*/mv) [ "${t[${#t[@]}-1]}" = "$f" ] && deny "$name is append-only; it is never replaced." ;;
+    esac
     return 0
 }
 
@@ -119,8 +137,8 @@ check_rm() {   # $@: the tokens after 'rm'
     for tok in "$@"; do
         case "$tok" in
             -*) continue ;;
-            "$NOTES"|"$TECHNIQUES")
-                deny "the handoff files are rewritten or appended, never deleted." ;;
+            "$NOTES"|"$REJECTED"|"$COMMITS"|"$TECHNIQUES"|"$TECHNIQUES"/*|"$DECISIONS"|"$DECISIONS"/*|"$STATE"/project.md)
+                deny "the loop's memory is rewritten, added to or corrected, never deleted; a technique that proved wrong is corrected in place." ;;
         esac
         [ "$recursive" -eq 1 ] || continue
         case "$tok" in
@@ -132,13 +150,49 @@ check_rm() {   # $@: the tokens after 'rm'
     return 0
 }
 
+# The subject the commit this command makes will have: the first paragraph of
+# its first -m, of the -F file, or of the heredoc fed to -F -, joined as git's
+# %s joins it. Empty when it cannot be told.
+commit_subject() {
+    printf '%s' "$raw_cmd" | python3 -c '
+import re, shlex, sys
+raw = sys.stdin.read()
+m = re.search(r"<<-?\s*[\x27\x22]?(\w+)[\x27\x22]?[^\n]*\n(.*?)\n\s*\1\s*(\n|$)", raw, re.S)
+heredoc = m.group(2) if m else ""
+line = next((l for l in raw.split("\n") if re.search(r"\bcommit\b", l)), "")
+try:
+    toks = shlex.split(re.sub(r"<<-?\s*\S+", "", line))
+except ValueError:
+    sys.exit()
+msg = None
+toks = toks[toks.index("commit") + 1:] if "commit" in toks else []
+for i, t in enumerate(toks):
+    nxt = toks[i + 1] if i + 1 < len(toks) else ""
+    if t in ("-m", "--message"): msg = nxt
+    elif t.startswith("--message="): msg = t[10:]
+    elif t.startswith("-m") and len(t) > 2 and not t.startswith("--"): msg = t[2:]
+    elif t in ("-F", "--file") or t.startswith("--file="):
+        f = t[7:] if t.startswith("--file=") else nxt
+        if f == "-": msg = heredoc
+        else:
+            try: msg = open(f, encoding="utf-8", errors="replace").read()
+            except OSError: msg = None
+    if msg is not None: break
+if msg:
+    paras = re.split(r"\n\s*\n", msg.strip("\n"))
+    print(" ".join(paras[0].split()) if paras and paras[0].strip() else "")
+' 2>/dev/null
+}
+
 # ------------------------------------------------------------------- git
 check_git() {   # $@: the tokens after 'git'; $flat is in scope
     local sub="" t
+    git_dir=""
     while [ $# -gt 0 ]; do
         t=$1; shift
         case "$t" in
-            -C|-c|--git-dir|--work-tree|--namespace|--exec-path|--super-prefix) shift ;;  # global option with a value
+            -C) git_dir=${1:-}; case "$git_dir" in /*) ;; *) git_dir=$REPO/$git_dir ;; esac; shift ;;
+            -c|--git-dir|--work-tree|--namespace|--exec-path|--super-prefix) shift ;;  # global option with a value
             -*) ;;                                                                        # other global option
             *) sub=$t; break ;;
         esac
@@ -152,12 +206,43 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
         push)
             deny "git push: what leaves this machine is the user's decision." ;;
         commit)
-            [[ "$args" == *" --amend "* ]] \
-                && deny "git commit --amend: an amend once rewrote the user's hand commit. Fix forward with a new commit; correct a wrong number in LOOP_NOTES."
+            if [[ "$args" == *" --amend "* ]]; then
+                target=$REPO
+                [ -n "${git_dir:-}" ] && target=$git_dir
+                head=$(git -C "$target" rev-parse -q --verify HEAD 2>/dev/null)
+                amend_help="Fix a message the loop got wrong: its own unpushed newest commit with 'git commit --amend --only -F <file>'; any other with 'git notes append -F <file> <commit>'."
+                printf '%s' "$args" | grep -Eq ' (--only|-o) ' || deny "git commit --amend changes only a message here, never content: add --only. $amend_help"
+                [[ "$args" == *" -- "* ]] && deny "git commit --amend --only takes no paths: it corrects the message, not the tree. $amend_help"
+                own=""
+                if [ -n "$head" ] && [ -e "$COMMITS" ]; then
+                    grep -qx "$head" "$COMMITS" && own=1
+                    parent=$(git -C "$target" rev-parse -q --verify "HEAD^" 2>/dev/null)
+                    subject=$(git -C "$target" log -1 --format=%s HEAD 2>/dev/null)
+                    grep -qxF "$parent	$subject" "$COMMITS" && own=1
+                fi
+                [ -n "$own" ] \
+                    || deny "HEAD is not a commit the loop made (no commit on its parent with its subject in $COMMITS); someone else's commit is never amended. $amend_help"
+                [ -z "$(git -C "$target" branch -r --contains "$head" 2>/dev/null)" ] \
+                    || deny "HEAD is on a remote branch already: pushed history is never rewritten. $amend_help"
+            fi
             printf '%s' "$args" | grep -Eq ' (-[a-zA-Z]*[aipect][a-zA-Z]*|--all|--interactive|--patch|--edit|--reedit-message|--template)( |=)' \
                 && deny "git commit -a/-i/-p/-e/-c/-t: stages other people's changes or waits on an editor. Name the files you stage; pass the message with -m or -F."
             printf '%s' "$args" | grep -Eq ' (-[a-zA-Z]*m|--message|-F|--file|-C|--reuse-message|--fixup|--squash|--no-edit)' \
                 || deny "git commit without -m or -F opens an editor, which hangs the loop."
+            # Recorded before it runs: the parent it will sit on and the subject it
+            # will have. That is how an amend later tells the loop's own commit
+            # from one the user made by hand, whatever the commit printed.
+            ctarget=$REPO; [ -n "${git_dir:-}" ] && ctarget=$git_dir
+            if [[ "$args" == *" --amend "* ]]; then
+                cparent=$(git -C "$ctarget" rev-parse -q --verify "HEAD^" 2>/dev/null)
+            else
+                cparent=$(git -C "$ctarget" rev-parse -q --verify HEAD 2>/dev/null)
+            fi
+            csubject=$(commit_subject)
+            if [ -n "$cparent" ] && [ -n "$csubject" ]; then
+                mkdir -p "$(dirname "$COMMITS")"
+                printf '%s\t%s\n' "$cparent" "$csubject" >> "$COMMITS"
+            fi
             ;;
         add)
             for tok in "$@"; do
@@ -228,6 +313,14 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
             [[ "$args" == *" --no-edit "* ]] || deny "git revert without --no-edit opens an editor." ;;
         cherry-pick)
             printf '%s' "$args" | grep -Eq ' (-e|--edit) ' && deny "git cherry-pick -e opens an editor." ;;
+        notes)
+            case " $* " in
+                *" append "*)
+                    printf '%s' " $* " | grep -Eq ' (-m|-F|--message|--file)' \
+                        || deny "git notes append without -m or -F opens an editor." ;;
+                *" show "*|*" list "*|" "|"  ") ;;
+                *) deny "git notes: only 'append' (with -m or -F), 'show' and 'list'; a note is never removed or rewritten." ;;
+            esac ;;
         rm)
             for tok in "$@"; do
                 case "$tok" in
@@ -236,6 +329,22 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
             done ;;
     esac
     return 0
+}
+
+check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; anything that reaches GitHub is the user's.
+    local sub=${1:-} act=${2:-}
+    case "$sub" in
+        ""|--version|version|help|status|search) return 0 ;;
+        auth)     [ "$act" = status ] && return 0 ;;
+        run)      case "$act" in list|view|download) return 0 ;; esac ;;   # not watch: it blocks past the tool's timeout
+        pr)       case "$act" in list|view|diff|checks|status) return 0 ;; esac ;;
+        issue)    case "$act" in list|view|status) return 0 ;; esac ;;
+        release)  case "$act" in list|view|download) return 0 ;; esac ;;
+        repo)     [ "$act" = view ] && return 0 ;;
+        workflow) case "$act" in list|view) return 0 ;; esac ;;
+        api)      printf '%s' " $* " | grep -Eq ' (-X|--method)[ =]?(POST|PUT|PATCH|DELETE)| (-f|-F|--field|--raw-field|--input)[ =]' || return 0 ;;
+    esac
+    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release: list and view; api GET); what reaches GitHub is the user's."
 }
 
 # Split on command separators and substitutions; inspect every segment.
@@ -247,16 +356,29 @@ for seg in "${segs[@]}"; do
     toks=($seg)
     [ ${#toks[@]} -eq 0 ] && continue
 
-    [[ "$seg" == *"$TECHNIQUES"* ]] && check_techniques "$seg"
+    [[ "$seg" == *"$REJECTED"* ]] && check_appendonly "$seg" "$REJECTED"
+    if [[ "$seg" == *"$TECHNIQUES/"* ]]; then
+        tf=$(printf '%s' "$seg" | grep -oE "$TECHNIQUES/[A-Za-z0-9_.-]+\.md" | head -1)
+        [ -n "$tf" ] && [ -e "$tf" ] && check_appendonly "$seg" "$tf"
+    fi
+    if [[ "$seg" == *"$DECISIONS"* ]] && printf '%s' "$seg" | grep -Eq "(>|tee|sed|perl|truncate|cp|mv|install)[^|;&]*$DECISIONS"; then
+        deny "rulings are written only by okf.py ruling, and never changed."
+    fi
+    case "$seg" in
+        *okf.py*" confirm"*) deny "confirming a ruling is the user's (okf.py confirm, from their own terminal)." ;;
+    esac
+    if [[ "$seg" == *"$COMMITS"* ]] && printf '%s' "$seg" | grep -Eq "(>|tee|sed|perl|truncate|cp|mv|install|rm)[^|;&]*$COMMITS"; then
+        deny "commits.log is written only by the guard, as it lets a commit through."
+    fi
 
     # Suite, probes and mypy carry their own timeout; the tool's timeout hides a hang.
-    # (Limitation: a bare token "xvfb-run" or "mypy" in a grep pattern trips this; quote it.)
+    # (Limitation: a bare token "xvfb-run" in a grep pattern still trips this.)
     needs_timeout=0; has_timeout=$outer_timeout
     for ((i = 0; i < ${#toks[@]}; i++)); do
         case "${toks[$i]}" in
             timeout) has_timeout=1 ;;
             xvfb-run) needs_timeout=1 ;;
-            -m) case "${toks[$((i + 1))]:-}" in pytest|mypy) needs_timeout=1 ;; esac ;;
+            -m) nxt=${toks[$((i + 1))]:-}; case "${nxt//[\"\']/}" in pytest|mypy) needs_timeout=1 ;; esac ;;
             *gates.sh) needs_timeout=0; has_timeout=1 ;;
         esac
     done
@@ -269,6 +391,7 @@ for seg in "${segs[@]}"; do
         case "${toks[$i]}" in
             git|*/git) check_git "${toks[@]:$((i + 1))}" ;;
             rm|/bin/rm|/usr/bin/rm) check_rm "${toks[@]:$((i + 1))}" ;;
+            gh|*/gh) check_gh "${toks[@]:$((i + 1))}" ;;
         esac
     done
 done

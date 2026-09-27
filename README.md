@@ -15,15 +15,19 @@ the loop refuses to run there.
 Read this before installing; the loop runs unattended.
 
 - It commits to the checkout `claude` was started in, on whatever branch is checked out,
-  after the full test suite, flake8 and mypy pass. It never pushes, never rewrites
-  history, never stashes, never stages files it did not name. Those are not habits: a
-  hook (`scripts/guard.sh`) refuses the commands, session-scoped, so your other Claude
-  Code sessions in the same checkout are unaffected.
+  after the full test suite, flake8 and mypy pass. It never pushes, never stashes, never
+  stages files it did not name, and never rewrites history, with one exception: the
+  message of its own newest commit while no remote branch contains it (`--amend --only`,
+  the tree unchanged). Any other wrong message gets a `git notes` note instead. Those are
+  not habits: a hook (`scripts/guard.sh`) refuses the commands, session-scoped, so your
+  other Claude Code sessions in the same checkout are unaffected, and notes the parent and
+  subject of each commit the loop makes, which is how it knows the loop's own.
 - It runs the suite under `xvfb-run` and probes it writes itself, every one wrapped in
   `timeout`, in the foreground.
-- It writes only two places: the checkout, and `state/` inside this directory (its
-  notes, a file of techniques that is never pruned, the probes those name, gate logs,
-  one export at a time). The real
+- It writes only two places: the checkout, and `state/` inside this directory, its
+  memory: an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format)
+  bundle of techniques, your rulings (which it records but never edits), what it examined
+  and left alone, its notes, the probes the techniques name, and gate logs. The real
   MComix configuration under `~/.config/mcomix` and `~/.local/share/mcomix` is refused
   by the hook and, if you merge the settings snippet, denied by Claude Code itself.
 - It runs in `auto` permission mode, because a permission prompt stalls a loop nobody
@@ -49,7 +53,7 @@ If any of that is more than you want an unattended process to do, do not install
 As a personal skill (available in every session, the state kept out of any repository):
 
     git clone https://github.com/twwn/mcomix-loop ~/.claude/skills/mcomix-loop
-    chmod +x ~/.claude/skills/mcomix-loop/scripts/*.sh
+    chmod +x ~/.claude/skills/mcomix-loop/scripts/*.sh ~/.claude/skills/mcomix-loop/scripts/okf.py
 
 or as a project skill inside the checkout (`.claude/` must then be in `.git/info/exclude`,
 see below):
@@ -62,14 +66,22 @@ gitignored and untouched.
 Then:
 
 1. Seed the state: `mkdir -p state && cp -r base/. state/`. `base/` holds another
-   installation's knowledge of this code base — `techniques.md` (never pruned, the
-   valuable part), the `probes/` it names, `notes.md` cut down to gate numbers, open leads
-   and dead ends — plus two files that are yours to edit: `config.sh` (set `WORKERS` to
-   what you measure, `-n auto` is slower on this suite; on Python 3.12 or 3.13 set
-   `EXPORT_DIR` to a short path) and `project.md` (replace the author's facts with yours:
-   where your fork stands, standing decisions, campaigns already finished). The loop reads
-   those two and edits neither. The first iteration re-baselines the gate numbers on your
-   tree and rewrites the notes as its own; the techniques file it keeps and extends.
+   installation's knowledge of this code base: `techniques/` (how to measure and test it;
+   the valuable part), `rejected.md` (what was examined and found fine), the `probes/`
+   the techniques name, and `notes.md` cut down to gate numbers. Three things in it are
+   about one installation and yours to adapt:
+   - `config.sh`: set `WORKERS` to what you measure (`-n auto` is slower on this suite);
+     on Python 3.12 or 3.13 set `EXPORT_DIR` to a short path.
+   - `project.md`: replace the author's facts with yours (where your fork stands, how you
+     release, campaigns already finished).
+   - `decisions/`: the author's rulings, one file each. Keep those tagged `program` if you
+     build on this fork (they say why the program behaves as it does), delete those
+     tagged `installation`, then confirm what you keep: `python3 scripts/okf.py confirm
+     --as <you> state/decisions/*.md`. The loop records new rulings there itself and
+     marks the unconfirmed ones in its prompt until you do the same for them.
+
+   The loop never edits `config.sh`, `project.md` or a ruling. The first iteration
+   re-baselines the gate numbers on your tree and rewrites the notes as its own.
 2. Merge `settings-snippet.json` into `~/.claude/settings.json`. `additionalDirectories`
    is needed only for the personal-skill install (write the absolute path if `~` is not
    expanded); `attribution.commit` is the commit trailer, yours to change; `worktree.baseRef:
@@ -78,6 +90,12 @@ Then:
 3. In the checkout: `echo '.claude/' >> .git/info/exclude`. The campaign worktree and
    Claude Code's own subagent worktrees live under `.claude/`, and the loop reads an
    untracked path in `git status` as someone's work in progress.
+4. In the checkout's `.claude/settings.local.json`: `{"autoMemoryEnabled": false}`.
+   Claude Code's auto memory is a second, uncurated memory whose index loads into every
+   session; left on, the loop files rulings there instead of in `decisions/`, and stale
+   entries contradict the curated files. The guard refuses the loop's writes there either
+   way; the setting spares it the refused attempts. It applies to every session in that
+   checkout, interactive ones included.
 
 ## Run
 
@@ -95,31 +113,46 @@ the same command. A loop that stopped by itself says why in its last report and 
 
 `SKILL.md` is the protocol; its body is static, so it costs its tokens once per session
 and once after each compaction. The loop never edits anything in this directory except
-`state/`, and inside `state/` never `config.sh` or `project.md`; a hook enforces that. `scripts/state.sh` is the first command of every
-iteration and prints the tree, the commits since the notes' baseline, the notes and the
-headings of the techniques file. `scripts/gates.sh` runs the three gates with hard
-timeouts and prints one line each. Three hooks are registered for the session that
-invoked the skill: `guard.sh` (PreToolUse, the never-rules), `stop-check.sh` (Stop: a
-turn whose gates ran after the notes were last written does not end), and a
-SessionStart hook on compaction that prints `invariants.md`. `reference.md` holds the
-task list and the facts of the code base; `state/project.md` holds the facts of your
-installation; both are injected at the end of the prompt.
+`state/`, and inside `state/` never `config.sh` or `project.md`; a hook enforces that.
+`scripts/state.sh` is the first command of every iteration and prints the checkout and
+its branch, the tree, the commits since the notes' baseline, the notes and the names of the
+techniques. `scripts/gates.sh` runs the three gates with hard timeouts and prints one line
+each. Three hooks are registered for the session that invoked the skill: `guard.sh`
+(PreToolUse: the never-rules, and which commits are the loop's), `stop-check.sh` (Stop: no
+ending a turn whose gates ran after the notes were written, or while the bundle is broken),
+and a SessionStart hook on compaction that prints `invariants.md`.
 
-The notes file is the loop's memory: about 80 lines, rewritten every iteration, with
-gate numbers as of a commit, the open campaign, decisions and questions, what the last
-iteration changed with the command that proves each claim, ranked leads with evidence,
-and what was checked and rejected. The techniques file is append-only and never pruned.
+The memory is an [OKF 0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format)
+bundle: every `.md` in `state/` opens with YAML frontmatter naming its `type`, the
+`index.md` files are generated, and `scripts/okf.py` lists, renders and checks it (the Stop
+hook refuses to end a turn while a concept's frontmatter is broken).
+
+| in `state/` | type | holds | written | read |
+|---|---|---|---|---|
+| `notes.md` | Iteration Notes | gate numbers, open campaign, questions, the last claim, leads | rewritten every iteration | in full, every iteration |
+| `techniques/*.md` | Technique | how to measure and test this code base, one topic each, with the source files it depends on | added to, corrected in place, never deleted | names every iteration (flagged when a source file changed since), files on demand |
+| `rejected.md` | Rejection Register | what was examined and left alone, and why | added to, corrected in place | `grep` before a lead |
+| `decisions/*.md` | Ruling | your rulings, in your words, `program` or `installation` | created by `okf.py ruling`, never edited; confirmed by you | one line each, injected into the prompt, unconfirmed ones marked |
+| `project.md` | Installation | the facts of your installation | by you | in full, injected into the prompt |
+
+`reference.md` holds the task list and the facts of the code base and is injected with the
+last two. A technique's sources are written `repo:<path>`, a file in the MComix checkout.
+
+A wrong message on a commit the loop could not amend is a note: `git log` shows it, GitHub
+does not, and `git config notes.rewriteRef refs/notes/commits` carries notes across your own
+rebases if you would rather keep them than fold them into the messages.
 
 ## Publishing your state
 
-The techniques file and the probes get better with use and are meant to be pushed back.
-`scripts/publish-base.sh`, run by hand with no loop session open, copies
-`state/techniques.md` and `state/probes/` into `base/`, and copies `state/notes.md` with
-the sections that belong to one installation (decisions, questions, the last iteration,
-prompt corrections) blanked and the gate numbers marked as a seed. It then lists lines that
-look machine- or installation-specific — `/tmp` paths, GPU names, a review process another
-session ran — for you to reword or drop before committing. `config.sh` and `project.md`
-are not copied; `base/` carries them as examples.
+The techniques and the probes get better with use and are meant to be pushed back.
+`scripts/publish-base.sh`, run by hand with no loop session open, copies `state/` into
+`base/`: techniques, rulings, `rejected.md`, `project.md` and probes whole (the rulings and
+`project.md` as the author's worked example), `notes.md` with the sections that belong to
+one installation blanked and the gate numbers marked as a seed, never `config.sh` or
+`commits.log`. It replaces your home path in what it copies, regenerates the index files,
+adds a `log.md` entry and checks conformance. It then lists lines that look personal (a
+home path, GPU names, a review process another session ran) for you to reword or drop
+before committing.
 
 ## Adapting it to another project
 

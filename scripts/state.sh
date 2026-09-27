@@ -14,7 +14,7 @@ mkdir -p "$SCRATCH"
 
 g() { git -C "$REPO" "$@" 2>/dev/null; }
 
-echo "== repo: $REPO =="
+echo "== repo: $REPO on branch $(g symbolic-ref --short -q HEAD || echo "(detached at $(g rev-parse --short HEAD))") =="
 echo "== state: $STATE (workers $WORKERS; timeouts $T_PYTEST/$T_FLAKE8/$T_MYPY s) =="
 echo "== tree =="
 st=$(g status --short)
@@ -43,15 +43,20 @@ b=$(g branch --list 'loop/*'); [ -n "$b" ] && printf '%s\n' "$b" || echo "none"
 [ -e "$CAMPAIGN" ] && echo "campaign worktree present: $CAMPAIGN"
 
 echo "== LOOP_NOTES =="
-cat "$NOTES" 2>/dev/null || echo "MISSING (fresh chain: baseline the gates on a clean tree, write the file from scratch at the end)"
+if [ -e "$NOTES" ]; then awk 'NR == 1 && /^---$/ { fm = 1; next } fm && /^---$/ { fm = 0; next } !fm' "$NOTES"
+else echo "MISSING (fresh chain: baseline the gates on a clean tree, write the file from scratch at the end)"; fi
 
-echo "== LOOP_TECHNIQUES sections =="
-grep -nE '^## ' "$TECHNIQUES" 2>/dev/null || echo "MISSING"
-missing=$(grep -oE 'STATE/probes/[A-Za-z0-9_./-]+' "$TECHNIQUES" 2>/dev/null | sed 's/[.]*$//' | sort -u | while read -r ref; do
+echo "== LOOP_TECHNIQUES: $TECHNIQUES/<name>.md =="
+$OKF index >/dev/null 2>&1
+$OKF list 2>/dev/null || echo "MISSING"
+missing=$(cat "$TECHNIQUES"/*.md 2>/dev/null | grep -oE 'STATE/probes/[A-Za-z0-9_./-]+' | sed 's/[.]*$//' | sort -u | while read -r ref; do
     [ -e "$STATE/${ref#STATE/}" ] || printf '%s ' "$ref"
 done)
-[ -n "$missing" ] && echo "probes named above but not on disk (rebuild from the description before use): $missing"
+[ -n "$missing" ] && echo "probes named but not on disk (rebuild from the description before use): $missing"
+problems=$($OKF check 2>/dev/null)
+[ -n "$problems" ] && printf '== bundle problems (fix before ending the iteration) ==\n%s\n' "$problems"
 
 echo "== protocol =="
-echo "End: rewrite LOOP_NOTES, append LOOP_TECHNIQUES, delete iteration.md, report, ScheduleWakeup last (60 s; stop only for 3 quiet / unfixable gate / user's decision, with PushNotification)."
-echo "Never: stash, push, amend, add -A, background commands, suite/probe/mypy without timeout. Findings as they arrive -> $SCRATCH/iteration.md."
+echo "Before a lead: grep -rn its file and function in $REJECTED. A ruling from the user: record it with okf.py ruling, in their words, then act."
+echo "End: rewrite LOOP_NOTES, add to LOOP_TECHNIQUES/REJECTED, delete iteration.txt, report, ScheduleWakeup last (60 s; up to 900 while only a CI run is awaited; stop only for 3 quiet / unfixable gate / user's decision, with PushNotification)."
+echo "Never: stash, push, add -A, background commands, suite/probe/mypy without timeout; amend only your own unpushed tip, message only. Findings as they arrive -> $SCRATCH/iteration.txt."

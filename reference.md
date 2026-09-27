@@ -41,12 +41,13 @@ and refactoring, with documentation and comment coverage close behind.
 
 ## Project facts
 
-- **A release date is the maintainer's**, written by the release commit
-  (`docs/Maintenance.md` has the procedure). Nothing before that carries a
-  guessed one: `ChangeLog.md` heads the open section `<version>
-  (unreleased)` and the AppStream metainfo's `<releases>` gets its entry in
-  the release commit. A plausible date is worse than a missing one, because
-  nothing can tell it from a right one afterwards.
+- **A release is a commit the user orders**, and that commit is what writes
+  the version, the `ChangeLog.md` date and the AppStream metainfo
+  `<release>` entry (`docs/releasing.md` has the procedure). Nothing
+  before it carries a guessed date, and whether a `(unreleased)` section is
+  opened in the meantime is the user's practice, in `STATE/project.md`. A
+  plausible date is worse than a missing one, because nothing can tell it
+  from a right one afterwards.
 - **Python floor 3.12.** The machine running the loop is usually newer, so a
   feature past 3.12 works here and breaks a supported install. Review
   <https://docs.python.org/3/deprecations/index.html> at that baseline when
