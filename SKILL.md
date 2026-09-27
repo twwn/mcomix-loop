@@ -35,51 +35,67 @@ checkout. One iteration is one invocation of this skill. Its body is static,
 so the harness appends it once per session and again, truncated, after each
 compaction; the state comes from `state.sh` below. Iterations share one
 session that is compacted as it fills, so the conversation is unreliable
-memory; what carries across is `git log` and the files under `STATE` =
-`state/` beside this file, the one place outside `REPO` the loop writes
-(`state.sh` prints its absolute path; use it absolute, since shell variables
-do not survive from one command to the next):
+memory; what carries across is `git log` and `STATE` = `state/` beside this
+file, the one place outside `REPO` the loop writes (`state.sh` prints its
+absolute path; use it absolute, since shell variables do not survive from one
+command to the next). `STATE` is an Open Knowledge Format bundle: every `.md`
+in it opens with YAML frontmatter naming its `type`, `scripts/okf.py` reads and
+checks it, and the `index.md` files are generated. Written one line per
+paragraph or list entry, never hard-wrapped: an Edit then matches the text
+as it is.
 
-- `LOOP_NOTES` = `STATE/notes.md` — the previous iteration's handoff: state,
-  leads, decisions, open questions. Capped, rewritten every iteration.
-- `LOOP_TECHNIQUES` = `STATE/techniques.md` — what has been learned about
-  measuring and testing this code base. Nothing in it is ever deleted or
-  pruned for space; the guard refuses Write and `>` on it. Add with Edit or
-  `>>`, and add *into the section the topic already has* rather than opening
-  "X (continued)" at the end. A statement that turns out wrong is corrected
-  in place with Edit, marked "(corrected at <commit>)", not contradicted by a
-  later section a reader may never reach.
-- `SCRATCH` = `STATE/scratch/` — gate logs, exports, the working note; what
-  one iteration needs, not preserved. The scratchpad the harness names is
-  forgotten at compaction; this one is not.
-- `STATE/probes/` — a probe, benchmark or script that proved itself is saved
-  here under the name `LOOP_TECHNIQUES` gives it, so the technique and its
-  instrument travel together. One that the techniques name but the directory
-  lacks (`state.sh` lists them) is not a prompt correction: rebuild it from
-  its description when a technique needs it, save it under that name, and
-  say so in the report.
-- `STATE/project.md` and `STATE/config.sh` are the user's, not yours: the
-  facts of this installation and the loop's settings. Read, never edit.
+- `LOOP_NOTES` = `STATE/notes.md` (`type: Iteration Notes`) — the previous
+  iteration's handoff: state, leads, open questions. Capped, rewritten every
+  iteration, frontmatter kept.
+- `LOOP_TECHNIQUES` = `STATE/techniques/<name>.md`, one `type: Technique`
+  concept each: how to measure and test this code base (rules in "Handoff:
+  `LOOP_TECHNIQUES`"). `state.sh` lists the names; `[sources changed]`
+  after one means a file it depends on changed since it was last written
+  or verified - re-check what you rely on before quoting it.
+- `DECISIONS` = `STATE/decisions/`, one `type: Ruling` file each: the
+  user's rulings in their words, tagged `program` or `installation`,
+  injected at the end of this file. Record one the moment it is given, and
+  only so: `python3 ${CLAUDE_SKILL_DIR}/scripts/okf.py ruling --tag <tag>
+  --title "<short>" --text '"<their words>" - <what it means>'`. Never
+  edited: a changed ruling is a new one naming the date it replaces; the
+  newest wins. Rulings only (a request once done counts: it stops a later
+  iteration "fixing" it back), not events. `(unconfirmed)` marks one the
+  user has not confirmed yet (`okf.py confirm` is theirs): follow it, but
+  when the tree or the user disagrees with it, ask rather than act on it.
+- `REJECTED` = `STATE/rejected.md` (`type: Rejection Register`) — what was
+  examined and deliberately left alone, one line each beginning with where
+  (`- backend.py:548 - ... Left (f792f346).`), added at the end, never
+  pruned; one proven wrong is corrected in place, "(reopened at <commit>:
+  ...)". Never read whole: `grep -n` it.
+- `STATE/probes/` — probes that proved themselves, under the names the
+  techniques give them. One named but missing (`state.sh` lists them) is
+  rebuilt from its description when needed; not a prompt correction.
+- `SCRATCH` = `STATE/scratch/` — gate logs, exports, `iteration.txt`; what
+  one iteration needs, outside the bundle, not preserved.
+- `STATE/project.md` (`type: Installation`) and `STATE/config.sh` are the
+  user's: the facts of this installation and the loop's settings. Read,
+  never edit; a ruling goes to `DECISIONS`, and nothing waits on the user
+  folding it in.
+- Claude Code's own auto memory (`~/.claude/projects/*/memory/`) is not
+  this loop's memory, and the guard refuses writes there.
 
-**This file states rules and facts that hold for many iterations. It does not
-state status.** Whether a campaign is open, what the gate numbers are, which
-lead is next: all of that lives in `LOOP_NOTES` and nowhere else, because a
-status written here goes stale the first time it changes and then reads as
-though it were current. Do not edit this file or `reference.md` beside it
-(the guard refuses). When you find something in them that the tree
-contradicts, record it under `Prompt corrections` in `LOOP_NOTES` for the
-user to fold in.
+**This file states rules, not status**: whether a campaign is open, the gate
+numbers, the next lead live in `LOOP_NOTES` only, since status written here
+goes stale and still reads as current. Do not edit this file or
+`reference.md` (the guard refuses); what the tree contradicts in them goes
+under `Prompt corrections` in `LOOP_NOTES` for the user.
 
 ## State
 
 The first action of every iteration, before any other tool call, is
-`${CLAUDE_SKILL_DIR}/scripts/state.sh`. It prints the tree, the commits since
+`${CLAUDE_SKILL_DIR}/scripts/state.sh`. It prints the checkout and the
+branch it is on (`BRANCH`, whatever its name), the tree, the commits since
 the baseline `LOOP_NOTES` names (foreign unless the notes say otherwise),
 worktrees and `loop/*` branches, `LOOP_NOTES` in full (MISSING means a fresh
-chain), the `## ` headings of `LOOP_TECHNIQUES` (Read a section before
-writing a probe or benchmark), and a two-line protocol footer. It is not
-re-run after a compaction: `SCRATCH/iteration.md` holds what this iteration
-has found since.
+chain), the names of the `LOOP_TECHNIQUES` concepts (Read the one you
+need before writing a probe or benchmark), bundle problems if any, and a
+protocol footer. It is not re-run after a compaction: `SCRATCH/iteration.txt`
+holds what this iteration has found since.
 
 Request from the user for this iteration (empty on a scheduled wakeup):
 $ARGUMENTS
@@ -88,20 +104,24 @@ $ARGUMENTS
 
 Every iteration ends the same way, whatever it did.
 
-1. Rewrite `LOOP_NOTES` (sections below). Append to `LOOP_TECHNIQUES` whatever
-   proved itself. Fold in `SCRATCH/iteration.md` and delete it.
+1. Rewrite `LOOP_NOTES` (sections below). Add to `LOOP_TECHNIQUES` whatever
+   proved itself and to `REJECTED` whatever was examined and left alone (if
+   not done as it happened). Fold in `SCRATCH/iteration.txt` and delete it.
 2. Write the report (see Reporting). The turn's final message is the report.
 3. **The last action is `ScheduleWakeup`** with `prompt`: the literal string
-   `/mcomix-loop`; `delaySeconds`: `60`, the floor — nothing here waits on
-   external state, so never pad it; `noop`: `false` if anything was committed
-   or a campaign advanced, `true` otherwise; `reason`: one line naming what
-   the next iteration should pick up.
+   `/mcomix-loop`; `delaySeconds`: `60`, the floor, unless the only work
+   left waits on a CI run the loop reads itself — then up to `900`, and the
+   `reason` names the run; never pad it otherwise; `noop`: `false` if
+   anything was committed or a campaign advanced, `true` otherwise;
+   `reason`: one line naming what the next iteration should pick up.
 
    **Stop instead** — `ScheduleWakeup` with `stop: true`, and a
    `PushNotification` naming the reason — for exactly these, and say which:
    - **Three consecutive quiet iterations**, counted by the `Quiet
      iterations` line: increment when nothing was committed, reset when
-     something was or a campaign advanced.
+     something was or a campaign advanced. When the leads run out,
+     `DECISIONS` or `project.md` may say what comes next — a release commit,
+     a sweep; that is then the lead, and the count starts after it.
    - **A broken gate you can neither fix nor attribute**, recorded in
      `LOOP_NOTES` first.
    - **A decision that is the user's, with nothing else left to do**: a
@@ -111,21 +131,20 @@ Every iteration ends the same way, whatever it did.
      and the loop works the leads; it stops only when the decision is all
      that stands between it and idleness.
 
-   Do not stop because the obvious work is done. Never stop with a campaign
-   open unless one of the above applies: a half-landed campaign is the one
-   state the loop must not be left in. The harness ends every loop seven days
-   after it started and gives an iteration that neither reschedules nor stops
-   one fallback wakeup about twenty minutes later, then nothing; neither is a
-   plan. The user restarts a stopped loop with `/loop /mcomix-loop`.
+   Do not stop because the obvious work is done, and never with a campaign
+   open unless one of the above applies. The harness's seven-day limit and
+   its one fallback wakeup (about twenty minutes after an iteration that
+   neither reschedules nor stops) are not a plan.
 4. **A direct request from the user outranks the normal pick** — the Request
    line above, or a message in the conversation ("do the three leads", an
-   answer to a question the notes asked). Do that, in the commits it needs,
-   then end the iteration as usual. If you are not going to reschedule, say
-   so. Nobody is watching the terminal: a question asked only in the report
-   is lost, so it goes in `LOOP_NOTES`.
+   answer to a question the notes asked). A ruling in it is recorded first
+   (`okf.py ruling`), in the user's words. Do that, in the commits it needs,
+   then end the iteration as usual. Nobody is watching the terminal: a
+   question asked only in the report is lost, so it goes in `LOOP_NOTES`.
 
-The Stop hook refuses to end a turn whose gates ran after `LOOP_NOTES` was last
-written. It is a net, not the plan.
+The Stop hook refuses to end a turn whose gates ran after `LOOP_NOTES` was
+last written, or while `okf.py check` finds a broken concept: a net, not the
+plan.
 
 ## What an iteration is
 
@@ -135,7 +154,7 @@ bundles two unrelated fixes because they were found together. Stop when the
 next lead would not fit, not after the first commit.
 
 Inside a campaign (see "Campaigns") the rule inverts: the campaign is a batch
-that master receives as one commit when all of it is done, and every iteration
+that `BRANCH` receives as one commit when all of it is done, and every iteration
 pushes that batch as far as it can.
 
 ## Start of every iteration
@@ -154,31 +173,27 @@ pushes that batch as far as it can.
 
 3. **Account for the commits that are not yours.** `state.sh` lists what
    landed since the commit `LOOP_NOTES` measured at; the user commits by hand
-   while iterations run. When a gate number disagrees, rule this out first — a foreign commit that adds tests raises
-   the count without anything being wrong. History is never rewritten: the
-   guard refuses `git commit --amend`, because an amend issued moments after
-   a hand commit once rewrote the user's commit. A number already committed
-   that turns out wrong is corrected in `LOOP_NOTES`; a wrong change is fixed
-   forward in a new commit.
+   while iterations run. When a gate number disagrees, rule this out first:
+   a foreign commit that adds tests raises the count without anything being
+   wrong. A wrong change is fixed forward in a new commit, never by
+   rewriting one (see "Commits" for a wrong message).
 
 4. **Verify the last iteration.** Run `gates.sh pytest` (cheap; catches
    flakes); the full `gates.sh` only if steps 2–3 found something or you are
    about to touch what could move flake8 or mypy. Then **re-run the one
    command `What the last iteration changed` recorded** — the probe, the
    benchmark, the `ast` comparison behind its central claim — and compare
-   what it prints now with what the notes say it printed. A recorded command is the
-   whole point of recording one: the iteration that made the claim believed
-   it, past claims have been wrong, and a wrong claim compounds. Only a claim
-   with no runnable command ("the menu is unchanged") goes to a
-   general-purpose subagent in the foreground, given the hash, the claim and
-   the relevant `LOOP_TECHNIQUES` section and nothing else, so that it
-   re-derives the check in a clean context.
+   what it prints now with what the notes say it printed: the iteration that
+   made the claim believed it, and a wrong claim compounds. Only a claim with
+   no runnable command ("the menu is unchanged") goes to a general-purpose
+   subagent in the foreground, given the hash, the claim and the relevant
+   technique and nothing else, so it re-derives the check in a clean context.
 
-5. **Re-check a lead's evidence before working it.** Leads are written by an
-   iteration that saw the tree as it was. Several have turned out to be stale
-   by the time they were picked up — coverage that already existed, comments
-   that had already been written. A stale lead goes to `Checked and rejected`
-   with what you found, not into a commit.
+5. **Re-check a lead's evidence before working it.** First `grep -n` its
+   file and function in `REJECTED`: a place already examined and left alone
+   is not reopened without evidence the entry did not have. Leads go stale
+   (coverage that already existed, comments already written): a stale one
+   goes to `REJECTED` with what you found, not into a commit.
 
 6. **Pick**, preferring: a broken gate, a bug that affects users, a measured
    slowdown, an incomplete feature, a refactor. An open campaign outranks all
@@ -188,7 +203,7 @@ pushes that batch as far as it can.
 files ("which modules import X", "where is option Y read") goes to an
 `Explore` subagent, which returns the answer without the search. Gate and
 probe output goes to files under `SCRATCH` and is grepped, never read whole.
-Append each finding to `SCRATCH/iteration.md` as it arrives, one append per
+Append each finding to `SCRATCH/iteration.txt` as it arrives, one append per
 finding: after a compaction it is the only complete record of this
 iteration's uncommitted findings. Commands run in `REPO`; never `cd` away
 from it (a `cd` outside the project directory is reset anyway), and name
@@ -196,28 +211,20 @@ anything under `STATE` by its absolute path.
 
 ## Guardrails
 
-The guard (`scripts/guard.sh`, a PreToolUse hook registered for this session)
-refuses what has gone wrong before: `git stash`, `git push`, `--amend`,
-`add -A`/`add .`/`commit -a`, `reset --hard`, `clean`, `checkout`/`switch`
-of a branch, `checkout -- .`, `rebase` outside the
-campaign worktree, `merge` without `--squash`, `worktree remove` of anything
-but the loop's own, deleting a branch not named `loop/*`, `tag`,
-`remote`, `config` writes, `sudo`, any command naming the user's real MComix
-data or a checkout listed in the guard's `FOREIGN`, overwriting
-`LOOP_TECHNIQUES`, `pytest`, `xvfb-run` or `mypy` without `timeout`, and
-`run_in_background`. A refusal is not a puzzle to route around: it names a
-rule from this file, so do what the rule says. Everything below is judgment
-the guard cannot make.
+The guard (`scripts/guard.sh`, a PreToolUse hook for this session) refuses
+what has gone wrong before - stash, push, amending anything but its own
+message, staging what you did not name, discarding or checking out what is
+the user's, rewriting history or the bundle, the user's real data, a gate
+without `timeout`, background commands - and names the rule when it does.
+A refusal is not a puzzle to route around: do what the rule says.
+Everything below is judgment the guard cannot make.
 
 **Other sessions share this repository.** The user commits by hand while
-iterations run, and other sessions work in the same checkout. Branches and
-commits are safe to share; the stash stack is not, worktrees you
-did not create are not yours to add or remove, and a branch another worktree
-has checked out is not yours to check out. The worktree list from `state.sh`
-is the current picture — everything there except `.claude/worktrees/` is
-someone else's. `FOREIGN` in `STATE/config.sh` lists checkouts the guard
-refuses outright; a foreign worktree that is not listed there is a question
-for the user, under `Questions for the user`, not a path to add yourself.
+iterations run. Worktrees you did not create, and branches they have checked
+out, are not yours: in the worktree list from `state.sh` everything outside
+`.claude/worktrees/` is someone else's (`FOREIGN` in `STATE/config.sh` lists
+the ones the guard refuses outright; another one is a question for the
+user).
 
 **Nothing may touch the user's real data.** `mcomix/constants.py` resolves
 `CONFIG_DIR`, `DATA_DIR` and the paths derived from them at import time, so
@@ -248,10 +255,8 @@ are not daemons; only `terminate_program()` stops them. A probe flushes stdout
 and calls `os._exit(0)` when it is done.
 
 **A benchmark does not outlast what it measures.** One `xvfb-run`, one
-process, the whole matrix inside it; poll for a condition rather than sleeping.
-
-**No going back to GTK3.** No GTK3 idiom, no shim keeping both toolkits
-working, no `gi.require_version` fallback.
+process, the whole matrix inside it; poll for a condition, never sleep. **No
+going back to GTK3**: no GTK3 idiom, no shim for both, no fallback.
 
 ## Handoff: `LOOP_NOTES`
 
@@ -264,9 +269,6 @@ a changelog — `git log` is the changelog. Sections, in this order:
                                      "Quiet iterations: N")
 ## Campaign                         (the open one, its worktree, branch and
                                      progress; or "None open")
-## Decisions from the user          (answers given in conversation and not
-                                     yet in STATE/project.md; once they are
-                                     there, drop them here)
 ## Questions for the user           (what blocks work first, then open
                                      proposals, each dated by the commit it
                                      was raised at; information for the
@@ -278,37 +280,43 @@ a changelog — `git log` is the changelog. Sections, in this order:
 ## Leads worth picking up           (ranked; each with evidence the next
                                      iteration can check: file:line, a
                                      command and what it printed)
-## Checked and rejected             (with why - this is what stops the next
-                                     iteration re-deriving a dead end)
 ## Prompt corrections               (statements in this file the tree
                                      contradicts)
 ```
 
-When a section would push the note past its cap, the durable half of it
-belongs in `LOOP_TECHNIQUES` and the settled half in `git log`. Never drop a
-question the user has not answered or a decision they gave.
+The file keeps its frontmatter (`type: Iteration Notes`). A ruling goes to
+`DECISIONS` and a dead end to `REJECTED` as they happen,
+not here. When a section would push the note past its cap, its durable half
+belongs in one of those or `LOOP_TECHNIQUES`, and its settled half in `git
+log`. Never drop a question the user has not answered.
 
 ## Handoff: `LOOP_TECHNIQUES`
 
-Add to it whenever a probe, harness, command or trap proves itself —
-anything that will still be true in twenty iterations — under a `## `
-heading that names what one would search for (the object and the trap:
-"xdist: a hang is a worker thread that never stopped"), because `state.sh`
-lists exactly those headings every iteration. Read the relevant section
-before writing a probe or a benchmark. Facts about the installation rather
-than the code base — how the fork is organised, who publishes what — belong
-in `STATE/project.md`, which is the user's to write: put them under
-`Decisions from the user` in `LOOP_NOTES` for the user to move. Do not prune
-this file to save space: the cap on `LOOP_NOTES` is exactly why it exists.
+Add to it whenever a probe, harness, command or trap proves itself — anything
+that will still be true in twenty iterations — in the concept whose topic it
+is, or in a new concept named for what one would search for (the object and
+the trap: "xdist: a hang is a worker thread that never stopped"), since
+`state.sh` lists exactly those names every iteration. A new concept is a new
+file whose frontmatter has `type: Technique`, `title`, `tags` (one of
+testing, gtk, code, windows, text), `sources` (`- { resource:
+"repo:<path>" }` for each file whose change would make it wrong, not every
+file it mentions) and `generated: { by: mcomix-loop/<your model id>, at:
+<now, UTC, ISO 8601> }`; a meaningful change moves `generated.at`. Correct
+a wrong statement in place, "(corrected at <commit>)"; never delete or
+overwrite a concept (the guard refuses). After re-checking one flagged
+`[sources changed]`, `okf.py verified <file>` records it. Link another as
+`[title](<name>.md)`. Read the relevant concept before writing a probe or a
+benchmark. It holds how to measure and test, not what was decided
+(`DECISIONS`), what was examined and left alone (`REJECTED`), or facts about
+the installation (`STATE/project.md`). Do not prune it to save space: the cap
+on `LOOP_NOTES` is exactly why it exists.
 
 ## Verification gates
 
 All three, before every commit, by one command:
 `${CLAUDE_SKILL_DIR}/scripts/gates.sh [pytest|static|deprecations]
 [--tree <dir>] [--export[=<rev>]]`. It prints one line per gate and leaves
-the full logs in `SCRATCH/pytest.txt`, `flake8.txt` and `mypy.txt`; it greps
-the pytest log rather than piping through `tail`, because the summary line
-gets lost among interleaved warning output often enough to mislead.
+the full logs in `SCRATCH/pytest.txt`, `flake8.txt` and `mypy.txt`;
 `deprecations` lists the `DeprecationWarning` names the last suite run
 reached. What it runs, for probes that need a variant:
 
@@ -329,22 +337,20 @@ exactly what exposes a race or a test that leaves state behind. Run the
 failing test under `-n WORKERS` several times on a clean export of the commit,
 and read what it waits for. This loop once dismissed a test it had just
 written because it passed on its own; under eight workers it failed five runs
-in six. It
-pumped the main loop, which delivered the finish of a scan over an empty
-directory, before reading what the scan's start had set. `--dist loadfile`
-helps diagnose that kind of failure but does not fix it.
+in six: it pumped the main loop, which delivered the finish of a scan over an
+empty directory, before reading what the scan's start had set. `--dist
+loadfile` helps diagnose that kind of failure but does not fix it.
 
 pytest must not lose passes, flake8 must stay silent, and mypy must stay at
 zero. The configuration is `--strict` plus `disallow_any_explicit`, so new
 code is fully annotated with real types, and an explicit `Any` needs an
 `ignore[explicit-any]` whose comment says why.
 
-**Timeouts:** 60 seconds for the suite and for any probe, 120 for mypy, as
-`timeout -k 5 <seconds>` inside the command. That is the only limit that
-works: the Bash tool's own timeout moves a command that overruns to the
-background instead of killing it, which hides a hang; `timeout` kills it and
-returns 124, and a hang is itself a finding. Run gates and probes in the
-foreground, never with `run_in_background`.
+**Timeouts:** `T_PYTEST` (60 s) for the suite and any probe, `T_MYPY` (120
+s) for mypy, from `STATE/config.sh`, as `timeout -k 5 <seconds>` inside the
+command — the Bash tool's own timeout backgrounds an overrun instead of
+killing it, which hides a hang. A hang (124) is itself a finding. Foreground
+only, never `run_in_background`.
 
 ## Commits
 
@@ -354,7 +360,19 @@ the cause and the evidence, passed with `-m` or `-F` (a commit without a
 message opens an editor, which hangs the loop). Name the files you stage;
 never `git add -A`. No trailer of any kind — no `Co-Authored-By`, no
 "Generated with", no session link: `attribution` in settings is empty and
-the curated history carries none.
+the curated history carries none. Write the message after the gates, from
+their output: a count typed from memory has been wrong before.
+
+**A message the loop got wrong is corrected, the commit never.** The guard
+notes each commit the loop is about to make, its parent and subject, in
+`STATE/commits.log`. Its own newest commit (parent and subject noted there),
+while nothing is on top of it and no remote branch contains it:
+`git commit --amend --only -F <file>` — message only, the tree stays as it
+is; the guard allows nothing else under `--amend`. Any other commit:
+`git notes append -F <file> <commit>`, which leaves the commit alone;
+`git log` shows the note under the message, and the user folds it in when he
+next rewrites history by hand. GitHub shows no notes, so a correction that
+matters to readers there is also a question for the user.
 
 ## Evidence standards
 
@@ -370,12 +388,8 @@ something surprising, prove the probe first.
 
 **A bug fix has a regression test you watched fail.** Write the test, copy
 the fixed file aside, `git checkout HEAD -- <file>`, confirm the test fails,
-copy it back, confirm it passes. Never `git stash`: the stash stack belongs
-to the repository, and other sessions share it.
-
-**A test that fixes nothing has to be shown to bite.** Coverage added on its
-own is proven by breaking the code it covers — cut out the call it claims to
-check — and confirming it fails, then restoring the code.
+copy it back, confirm it passes. **A test that fixes nothing is shown to
+bite**: break the code it covers, see it fail, restore the code.
 
 **A test of something asynchronous reads the synchronous effect first.** A
 signal handler runs inside the emission, but a worker thread's answer comes
@@ -397,38 +411,32 @@ duration, and measure at tens of thousands of books.
 
 **A change carries its documentation, reviewed.** A commit that changes
 behaviour, an option, a key, a dependency or a release step reads the pages
-under `docs/` it touches — not only the sentence about the change, but the
-page, for what is now wrong or verbose — and fixes them in the same commit;
-`test/test_wiki.py`, `test_keybindings.py` and `test_openwith_command.py`
-are the accuracy gates and fail on a page that drifted. Once `ChangeLog.md`
-has a section for the unreleased version, the commit adds its line there
-too, so that a release never needs archaeology over hundreds of commits.
+under `docs/` it touches - the page, not only the sentence, for what is now
+wrong or verbose - and fixes them in the same commit; `test/test_wiki.py`,
+`test_keybindings.py` and `test_openwith_command.py` fail on a page that
+drifted. A `ChangeLog.md` line goes in only where `STATE/project.md` says a
+section for the unreleased version is open.
 
 **A new translatable string carries its translations.** Regenerate
 `mcomix/messages/mcomix.pot`, merge it into every catalogue under
 `mcomix/messages/`, translate the new entries, and compile every `.mo`, all
-in the same commit;
-`test/test_messages.py` fails otherwise. The procedure is in
-`docs/Maintenance.md` and the commands in `LOOP_TECHNIQUES`.
+in the same commit; `test/test_messages.py` fails otherwise
+(`docs/development.md`; the commands are in the translation techniques).
 
 ## Campaigns
 
 A campaign is work too large for one commit that is still one change — a
-toolkit migration, a typing pass over the whole tree. It lands on master as a
-single squashed commit when all of it is done.
+toolkit migration, a typing pass over the whole tree. It lands on the branch
+the checkout is on (`state.sh` names it; `BRANCH` below) as a single squashed
+commit when all of it is done.
 
-**Opening one is the user's decision.** It stops master receiving the loop's
-other work for several iterations. Propose it under `Questions for the user`
-with a size estimate; do not open it on your own.
-
-**It is carried in a worktree of its own,** because the user commits in
-`REPO` by hand and loose files there have been swallowed by their amends. It
-lives inside the project directory, beside the harness's own subagent
-worktrees, so it needs no extra permission scope; `.claude/` is excluded from
-`git status` by `.git/info/exclude`:
+**Opening one is the user's decision**: propose it under `Questions for the
+user` with a size estimate. **It is carried in a worktree of its own**,
+because loose files in `REPO` have been swallowed by the user's amends; it
+lives under `.claude/worktrees/`, which `.git/info/exclude` hides:
 
 ```sh
-git worktree add -b loop/<campaign> .claude/worktrees/campaign master
+git worktree add -b loop/<campaign> .claude/worktrees/campaign BRANCH
 ```
 
 Record the branch under `## Campaign` in `LOOP_NOTES`. Commit every
@@ -439,7 +447,7 @@ the worktree (`gates.sh --tree .claude/worktrees/campaign`). Never
 working directory is `REPO`; address it with `git -C`. To land it:
 
 ```sh
-git -C .claude/worktrees/campaign rebase master   # then the gates again, there
+git -C .claude/worktrees/campaign rebase BRANCH   # then the gates again, there
 git merge --squash loop/<campaign>
 git commit -F <message file>                      # one message for the whole
 git worktree remove .claude/worktrees/campaign && git branch -D loop/<campaign>
@@ -453,37 +461,37 @@ out to subagents only where the units are independent — modules that do not
 import one another — and merge the branches back into `loop/<campaign>` one
 at a time with the gates run over the union. Pieces that share scaffolding,
 such as several views over one model, stay in one thread. A subagent with
-`isolation: "worktree"` gets a worktree under `.claude/worktrees/` branched
-from the session's HEAD — master, not the campaign branch, and only because
-`worktree.baseRef` is `head` in settings; the default branches from
-`origin/master`, which does not have the port at all. To start a unit from the campaign
-branch instead, make its worktree yourself and name the path in its task:
+`isolation: "worktree"` branches from `BRANCH` (only because
+`worktree.baseRef` is `head` in settings), not from the campaign branch; to
+start a unit from the campaign branch, make its worktree yourself —
 `git worktree add -b loop/<campaign>-<unit> .claude/worktrees/campaign-<unit>
-loop/<campaign>`.
+loop/<campaign>` — and name the path in its task.
 
 ## Reporting
 
-The report is terse: what was committed, what was measured, what was checked
-and rejected, whether the loop continues. Numbers, gate counts and commit
-hashes exact; no tool-call narration; never a dropped `not`, `only` or
-`except`; plain prose for a destructive-action warning or an ordered sequence
-that compression would make ambiguous. If the caveman plugin is installed its
-injected style applies on top (do not restate a level or announce the mode);
-if it is not, keep the report to a few lines anyway.
-
-Everything written down — commit messages, code, comments, docstrings, both
-handoff files, documentation, catalogues — is ordinary English prose, for
-readers who never saw the terminal.
+The report is terse: what was committed, measured, checked and rejected, and
+whether the loop continues. Numbers and hashes exact; no tool-call narration;
+never a dropped `not`, `only` or `except`; plain prose where compression would
+make a warning or an ordered sequence ambiguous. A caveman style injected by
+its plugin applies on top (do not restate or announce it). Everything written
+down - commits, code, comments, the bundle, docs, catalogues - is ordinary
+English prose, for readers who never saw the terminal.
 
 ## Reference
 
 The task list and the facts of the code base, from `reference.md` beside
-this file, then the facts of this installation from `state/project.md`, which
-the user maintains. This tail is what a compaction drops: Read both files
-again when you need them afterwards.
+this file; the facts of this installation from `state/project.md`, which
+the user maintains; the user's rulings from `state/decisions/`, one line
+each. This tail
+is what a compaction drops: Read them again (`okf.py rulings` for the
+rulings) when you need them afterwards.
 
 !`cat "${CLAUDE_SKILL_DIR}/reference.md"`
 
 ### This installation
 
-!`cat "${CLAUDE_SKILL_DIR}/state/project.md" 2>/dev/null || echo "(no state/project.md yet: no installation facts, no finished campaigns, no standing decisions from the user)"`
+!`cat "${CLAUDE_SKILL_DIR}/state/project.md" 2>/dev/null || echo "(no state/project.md yet: no installation facts, no finished campaigns)"`
+
+### The user's rulings
+
+!`python3 "${CLAUDE_SKILL_DIR}/scripts/okf.py" rulings 2>/dev/null || echo "(no rulings recorded)"`

@@ -1,0 +1,86 @@
+# Techniques
+
+## Running, testing, probing
+
+* [Checking what the port changed](checking-what-the-port-changed.md)
+* [Comment-only commits, proven by AST](comment-only-commits-proven-by-ast.md)
+* [Coverage: running it, and where it pays](coverage-running-it-and-where-it-pays.md)
+* [Flakes: make the rare case common](flakes-make-the-rare-case-common.md)
+* [Private names and dead code: AST sweeps](private-names-and-dead-code-ast-sweeps.md)
+* [Probes](probes.md)
+* [Property checks for pure code](property-checks-for-pure-code.md)
+* [Running the suite and probes](running-the-suite-and-probes.md)
+* [State one test leaves for the next](state-one-test-leaves-for-the-next.md)
+* [Sweeps that found work](sweeps-that-found-work.md)
+* [The GitHub CI: reading its results, reproducing its jobs](the-github-ci-reading-its-results-reproducing.md)
+* [The shell is zsh](the-shell-is-zsh.md)
+* [Warnings: the suite's and GTK's](warnings-the-suite-s-and-gtk-s.md)
+* [Working in this repository](working-in-this-repository.md)
+
+## GTK and PyGObject
+
+* [A click into an unfocused window: focus first, flag cleared from idle](a-click-into-an-unfocused-window-focus-first.md)
+* [A Gtk.Entry in a dialog selects all of itself](a-gtk-entry-in-a-dialog-selects-all-of-itself.md)
+* [A real click, drag or key under Xvfb: xdotool](a-real-click-drag-or-key-under-xvfb-xdotool.md)
+* [A worker that aborts inside GTK](a-worker-that-aborts-inside-gtk.md)
+* [Dialogs and widgets that outlive their window](dialogs-and-widgets-that-outlive-their-window.md)
+* [GTK reference counts, from Python](gtk-reference-counts-from-python.md)
+* [GTK's own documentation, offline](gtk-s-own-documentation-offline.md)
+* [GTK's renderer under Xvfb](gtk-s-renderer-under-xvfb.md)
+* [Icons](icons.md)
+* [Listeners that outlive what they belong to](listeners-that-outlive-what-they-belong-to.md)
+* [Pictures drawn larger than they are: missing, locked, CONTAIN](pictures-drawn-larger-than-they-are-missing.md)
+* [PyGObject introspection traps](pygobject-introspection-traps.md)
+* [Screenshots under Xvfb](screenshots-under-xvfb.md)
+* [The file chooser in a test](the-file-chooser-in-a-test.md)
+* [The frame after a page turn: read the page area, not the scroll bars](the-frame-after-a-page-turn-read-the-page-area.md)
+* [The recently-used list in a probe](the-recently-used-list-in-a-probe.md)
+* [Threads that share one thing](threads-that-share-one-thing.md)
+* [Which thread reaches something, across the whole suite](which-thread-reaches-something-across-the-whole.md)
+
+## The MComix code base
+
+* [A cold page turn](a-cold-page-turn.md)
+* [A collection's covers include the collections under it](a-collection-s-covers-include-the-collections.md)
+* [A page is listed before its file is there](a-page-is-listed-before-its-file-is-there.md)
+* [A page turn, timed and profiled](a-page-turn-timed-and-profiled.md)
+* [Actions nothing can reach: menus, tool bar, keys](actions-nothing-can-reach-menus-tool-bar-keys.md)
+* [Adding a keyboard action](adding-a-keyboard-action.md)
+* [Adding a prompt that can be answered for good](adding-a-prompt-that-can-be-answered-for-good.md)
+* [Building the book a test needs](building-the-book-a-test-needs.md)
+* [Changing the pages of the open book](changing-the-pages-of-the-open-book.md)
+* [Check-then-act on the file system, and code loaded from the working directory](check-then-act-on-the-file-system-and-code.md)
+* [Double page turns, traced](double-page-turns-traced.md)
+* [Encrypted archives: nothing asks on the reader's behalf](encrypted-archives-nothing-asks-on-the-reader-s.md)
+* [Every SQL statement the suite runs, explained](every-sql-statement-the-suite-runs-explained.md)
+* [Every way a book is left, and the question about its changes](every-way-a-book-is-left-and-the-question-about.md)
+* [File URIs and content types: GLib's, never urllib's or mimetypes'](file-uris-and-content-types-glib-s-never-urllib.md)
+* [Forward-compatible stores: what an older MComix reads](forward-compatible-stores-what-an-older-mcomix.md)
+* [gdk-pixbuf through glycin: what a call costs](gdk-pixbuf-through-glycin-what-a-call-costs.md)
+* [Library writes from the UI: two statements a book is seconds on disk](library-writes-from-the-ui-two-statements-a.md)
+* [Names and text from other systems: zip names, encodings, owners](names-and-text-from-other-systems-zip-names.md)
+* [Patching a dependency's version](patching-a-dependency-s-version.md)
+* [Sorts that leave ties to the listing order](sorts-that-leave-ties-to-the-listing-order.md)
+* [Text a reader typed, used as a pattern](text-a-reader-typed-used-as-a-pattern.md)
+* [The dynamic background colour: benchmark and test page](the-dynamic-background-colour-benchmark-and.md)
+* [The library window in a test: covers, drops and scans](the-library-window-in-a-test-covers-drops-and.md)
+* [The native PDF handler's worker processes](the-native-pdf-handler-s-worker-processes.md)
+* [Thumbnail orientation in the shared store](thumbnail-orientation-in-the-shared-store.md)
+* [Traps this code base has sprung](traps-this-code-base-has-sprung.md)
+* [What follows a book that moves or goes](what-follows-a-book-that-moves-or-goes.md)
+
+## Windows
+
+* [MSYS2's Python writes paths with / when MSYSTEM is set](msys2-s-python-writes-paths-with-when-msystem.md)
+* [The test suite under Wine](the-test-suite-under-wine.md)
+* [The Windows branches of portability.py, run on Linux](the-windows-branches-of-portability-py-run-on.md)
+* [The Windows build: PyInstaller, Wine and pwsh on Linux](the-windows-build-pyinstaller-wine-and-pwsh-on.md)
+* [Windows refuses to move or replace an open file: /proc/self/fd shows it on Linux](windows-refuses-to-move-or-replace-an-open-file.md)
+* [Windows: what the tests must not assume](windows-what-the-tests-must-not-assume.md)
+
+## Translations and documentation
+
+* [Documentation: where it lives and what checks it](documentation-where-it-lives-and-what-checks-it.md)
+* [Mnemonics, per language](mnemonics-per-language.md)
+* [Plural forms](plural-forms.md)
+* [Translations: template, catalogues, merging](translations-template-catalogues-merging.md)

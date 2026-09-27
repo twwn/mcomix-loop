@@ -1,0 +1,6 @@
+# The loop's memory and settings live here; never part of the repository.
+state/
+__pycache__/
+*.pyc
+# release archives of this repository, if one is unpacked into it
+*.tar.gz

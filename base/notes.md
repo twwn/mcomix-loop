@@ -1,9 +1,21 @@
-## Gate numbers as of e833b8e6 (seed from another installation; re-baseline)
+---
+type: Iteration Notes
+---
+## Gate numbers as of 6db038e9 (seed from another installation; re-baseline)
 
-    pytest -n 8     3104 passed, 12 xfailed (776 subtests), 19-22 s
+    pytest -n 8     3666 passed, 12 xfailed (2381 subtests), 26.2-28.0 s,
+                    56-59 warnings
+    floors venv     3491 passed, 8 skipped, -n 4, 35.5 s (at 8a0f4352)
     flake8 -F       silent
     mypy mcomix     no issues in 161 source files
-    catalogues      24 of them, 664 translated messages each, none fuzzy
+    catalogues      24 of them, 669 translated messages each, none fuzzy
+    deprecations    16 names; the 2 asyncio ones filtered (754140ea)
+    library schema  DB_VERSION 10 (recent.member, cf0b7e48)
+    prefs format    CONFIG_FORMAT_VERSION 4 (8e4c6fa1)
+    Linux CI        at c4d6d959: 1 failure, 3.12 only (fixed 1c42d6e4);
+                    "invalid (NULL) class pointer" 0 in all three jobs
+    Windows CI      at 12d00721: green, 755 s; one-file step 219
+                    passed in 161 s. Log: logs_98334836687
 
 Quiet iterations: 0
 
@@ -11,46 +23,17 @@ Quiet iterations: 0
 
 None open.
 
-## Decisions from the user
-
-None here; the standing ones are in STATE/project.md.
-
 ## Questions for the user
 
 None.
 
 ## What the last iteration changed
 
-Nothing on this installation yet. These notes were seeded from another
-installation; the gate numbers above are that checkout's, and the leads
-below were true there. Re-baseline the gates on a clean tree, then rewrite
-this file as your own.
+Nothing on this installation yet. The gate numbers above are that checkout's. Re-baseline the gates on a clean tree, then rewrite this file as your own.
 
 ## Leads worth picking up
 
-1. Not yet swept: the library's own dialogs against the book-close
-   question (LOOP_TECHNIQUES "What follows a book that moves or goes").
-2. What the suite's 25,000-odd Python warnings are: the 18 deprecation
-   names are all accounted for (see project.md), so the rest are something
-   else. `grep -oE '[A-Za-z]+Warning' SCRATCH/pytest.txt | sort | uniq -c`
-   is the first cut (LOOP_TECHNIQUES "The suite's own warnings are a sweep").
-3. Low coverage still unread: process.py 63% (130-201), portability.py
-   65%, collection_area.py 66%, event.py 69%, openwith.py 71%, as of an
-   earlier sweep that found 3 bugs; the command is in LOOP_TECHNIQUES
-   "Coverage".
-
-## Checked and rejected
-
-- ac8209e2's claim re-checked: `git show --stat ac8209e2 | grep -c "\.mo"`
-  still prints 0.
-- 207c3715's subject says "all 25 catalogues"; there are 24
-  (`ls mcomix/messages/*/LC_MESSAGES/mcomix.po | wc -l`). Not rewritten;
-  this is the record.
-- Everything the note at ac8209e2 listed still stands (the
-  `gtk_root_get_focus` assertion, preference tooltips, the editor's double
-  fetch, the slideshow's `_stop()`, subscriptions outliving their window,
-  3.12 idiom, `except Exception`, text used as a pattern, the port sweeps);
-  `git show ac8209e2` reaches it through the notes' history.
+None.
 
 ## Prompt corrections
 

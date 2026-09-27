@@ -1,0 +1,11 @@
+---
+type: Technique
+title: "A page turn, timed and profiled"
+tags: [code]
+generated: { by: mcomix-loop/claude, at: "2026-09-20T02:29:31+02:00" }
+---
+
+- (at 4bd8e7e2) STATE/probes/test_zz_page_turn.py opens big60.cbz in a MainWindow on MComixTest, waits until all 60 pages are extracted, turns 30 pages one at a time (each drawn before the next) and prints the median and worst wall time per turn and a cProfile of the run restricted to mcomix, by cumulative time.  PROFILE=0 times without the profiler.  At 4bd8e7e2: median 5.6 ms, max 9.7 ms; load_pixbuf and the thumbnail bar's selection are the largest shares.  It measures turns into pages already cached; a cold turn would have to wait for the extractor instead.
+- (at 45eb29f9) Re-measured: median 4.7 ms, max 10.6 to 13.5 ms over three runs - no regression since 4bd8e7e2, and the thumbnail sidebar's single-click activation (c7f7aad8) costs nothing.
+- **The profile covers the worker threads too**, which is why get_thumbnail() has the largest cumulative time although the sidebar makes its thumbnails on a WorkerThread: since Python 3.12 cProfile goes through sys.monitoring, which is process-wide rather than one thread's.  So cumulative times there are not the latency of a turn - the wall-clock median is - and `print_callers()` is what says which thread a line belongs to.  PROFILE=0 used to fail the probe, because pstats refuses a profiler that never ran; fixed in the saved copy.
+- (at 78569057) **The default preferences leave whole features off the measured path.** With 'smart bg' on and an enhancement set (insert `prefs['smart bg'] = True; window.enhancer.brightness = 1.1; window.draw_image(); pump()` before `times = []`, run with PROFILE=0) the turn was 19.1-19.3 ms against 4.4-5.6 ms with defaults: a second full-size enhance for the colour alone. Fixed in 78569057 (5.0-5.6 ms). Time the non-default options that touch _draw_image() too: enhancement, rotation, the dynamic background, double page. The saved probe takes `OPTS=smartbg,enhance,rot90,double,thumbs, manual`. At 78569057: none 4.4 ms median, enhance 4.9, rot90 4.4, double 9.3, double+smartbg 9.9, smartbg+thumbs 4.7 - double page is two pages' work and nothing else stands out.

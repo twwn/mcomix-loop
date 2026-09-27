@@ -11,7 +11,7 @@ from . import MComixTest, pump, wait_for
 
 from mcomix import constants, icons, main
 
-BOOK = '~/.claude/skills/mcomix-loop/state/probes/big60.cbz'
+BOOK = os.path.expanduser('~/.claude/skills/mcomix-loop/state/probes/big60.cbz')
 
 
 class ColdTurn(MComixTest):
