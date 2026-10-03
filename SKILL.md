@@ -217,7 +217,12 @@ message, staging what you did not name, discarding or checking out what is
 the user's, rewriting history or the bundle, the user's real data, a gate
 without `timeout`, background commands, anything that writes to GitHub
 (`gh` reads: list and view, `api` GET, `api graphql` with an inline query)
-- and names the rule when it does.
+but the issues and project `STATE/config.sh` names - and names the rule
+when it does. With `ISSUES_REPO` set:
+`gh issue create|edit|comment|close|reopen --repo <ISSUES_REPO>`; with
+`ISSUES_PROJECT` (`owner/number`):
+`gh project item-add|item-edit <number> --owner <owner>`. What to file and
+when is the user's rulings; unset, the loop prepares the commands for them.
 A refusal is not a puzzle to route around: do what the rule says.
 Everything below is judgment the guard cannot make.
 

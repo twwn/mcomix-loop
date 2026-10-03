@@ -43,6 +43,8 @@ T_FLAKE8=60
 T_MYPY=120
 FOREIGN=()         # checkouts other sessions own (absolute paths); refused by the guard
 EXPORT_DIR=$SCRATCH   # where `gates.sh --export` unpacks a tree; a short path on Python < 3.14
+ISSUES_REPO=""     # owner/name whose issues the loop may write with gh; empty: none
+ISSUES_PROJECT=""  # owner/number of the GitHub project whose items it may write; empty: none
 # shellcheck disable=SC1091
 [ -r "$STATE/config.sh" ] && . "$STATE/config.sh"
 
