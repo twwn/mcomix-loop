@@ -96,10 +96,12 @@ flat=${flat//$'\t'/ }
 while [[ "$flat" == *"  "* ]]; do flat=${flat//  / }; done
 # A quoted string with a space in it is text - a message, a pattern, a line
 # being written - not a command: blank it, so "mypy" or "(a; b)" in a
-# subject does not read as a command. What runs stays: the script of a
-# `-c` (sh, bash, python) or an `eval`, and a double-quoted string with a
-# command substitution in it. The checks for paths below see every string
-# but a commit message's (`data`).
+# subject does not read as a command. One without a space is a word (a
+# pattern, a path, `'*'`): it stays, but the separators in it separate
+# nothing, so `'s/x/(mypy)/'` does not start a command either. What runs
+# stays whole: the script of a `-c` (sh, bash, python) or an `eval`, and a
+# double-quoted string with a command substitution in it. The checks for
+# paths below see every string but a commit message's (`data`).
 data=$flat
 if [[ "$flat" == *[\"\']* ]]; then
     re_q="\"[^\"]*\"|'[^']*'"
@@ -110,9 +112,13 @@ if [[ "$flat" == *[\"\']* ]]; then
         pre=${rest%%"$q"*}
         rest=${rest#*"$q"}
         text=$q; message=$q
-        if [[ "$q" == *[[:space:]]* && ! ( "$q" == \"* && ( "$q" == *'$('* || "$q" == *'`'* ) ) ]]; then
+        if [[ "$q" == \"* && ( "$q" == *'$('* || "$q" == *'`'* ) ]]; then
+            :
+        elif [[ "$q" == *[[:space:]]* ]]; then
             has "$pre" '(^|[[:space:]])(-[a-zA-Z]*c|eval)[[:space:]]+$' || text=${q:0:1}MSG${q:0:1}
             has "$pre" '(-m|--message)(=|[[:space:]]+)$' && message=${q:0:1}MSG${q:0:1}
+        elif ! has "$pre" '(^|[[:space:]])(-[a-zA-Z]*c|eval)[[:space:]]+$'; then
+            text=${q//[;|&()\`]/_}
         fi
         flat+=$pre$text; data+=$pre$message
     done
