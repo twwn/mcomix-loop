@@ -91,6 +91,7 @@ The first action of every iteration, before any other tool call, is
 `${CLAUDE_SKILL_DIR}/scripts/state.sh`. It prints the checkout and the
 branch it is on (`BRANCH`, whatever its name), the tree, the commits since
 the baseline `LOOP_NOTES` names (foreign unless the notes say otherwise),
+the issues and discussions on GitHub (see "Issues and the project"),
 worktrees and `loop/*` branches, `LOOP_NOTES` in full (MISSING means a fresh
 chain), the names of the `LOOP_TECHNIQUES` concepts (Read the one you
 need before writing a probe or benchmark), bundle problems if any, and a
@@ -221,8 +222,9 @@ but the issues and project `STATE/config.sh` names - and names the rule
 when it does. With `ISSUES_REPO` set:
 `gh issue create|edit|comment|close|reopen --repo <ISSUES_REPO>`; with
 `ISSUES_PROJECT` (`owner/number`):
-`gh project item-add|item-edit <number> --owner <owner>`. What to file and
-when is the user's rulings; unset, the loop prepares the commands for them.
+`gh project item-add|item-edit|field-create <number> --owner <owner>`. What
+to file and when is in "Issues and the project"; unset, the loop prepares
+the commands for the user.
 A refusal is not a puzzle to route around: do what the rule says.
 Everything below is judgment the guard cannot make.
 
@@ -386,6 +388,55 @@ is; the guard allows nothing else under `--amend`. Any other commit:
 `git log` shows the note under the message, and the user folds it in when he
 next rewrites history by hand. GitHub shows no notes, so a correction that
 matters to readers there is also a question for the user.
+
+## Issues and the project
+
+With `ISSUES_REPO` and `ISSUES_PROJECT` set, the open issues are the feature
+list and the public record of planned work; `STATE/scratch/sf/features.md`
+is retired once they hold everything in it. `state.sh` reads them, and the
+discussions, every iteration. What the loop posts is public, under the
+user's account.
+
+- **A lead that has an issue** moves to In Progress when an iteration starts
+  on it: `gh project item-edit <number> --owner <owner> --url <issue url>
+  --field Status --value "In Progress"`; one put aside goes back to Todo.
+  Never set Done by hand: the project closes an issue set to Done, and sets
+  Done on one that closes.
+- **The commit that finishes it** is followed by `gh issue comment <n> --repo
+  <ISSUES_REPO> --body "Done in <hash>."`. The issue stays open until the
+  commit is on GitHub. `state.sh` then lists it under "to close" (the user
+  pushes from this checkout, so `origin/main` moves without a fetch), and
+  that iteration closes it first: `gh issue close <n> --repo <ISSUES_REPO>
+  --reason completed`. One listed as pushed under a new hash, rewritten
+  before the push, has its comment changed first: `gh issue comment <n>
+  --repo <ISSUES_REPO> --edit-last --body "Done in <new hash>."`.
+- **An item decided against**, by the user or the loop, is closed with
+  `--reason "not planned" --comment "<one line saying why>"`.
+- **A commit message names no issue**, neither "Closes #24" nor "#24". The
+  curated history carries no trailers (ruling 2026-09-21), and every rewrite
+  the user pushes would add another reference to the issue's timeline.
+- **Every open issue has a Size** in the project (Small, Medium, Large,
+  Campaign): `item-edit ... --field Size --value <size>`. If the field is
+  missing: `gh project field-create <number> --owner <owner> --name Size
+  --data-type SINGLE_SELECT --single-select-options
+  Small,Medium,Large,Campaign`.
+- **A campaign's issue holds its steps as sub-issues**, filed as its plan
+  names them (`gh issue create --repo <ISSUES_REPO> --parent <n>`, `gh issue
+  edit <n> --repo <ISSUES_REPO> --add-sub-issue <m>`). The steps' commits
+  are scratch, so the commit that lands the campaign is what all of them
+  are done in.
+- **Bodies and comments** are public prose in the brevity ruling's style.
+  They never mention the loop's own files (STATE, scratch, the notes, item
+  numbers of the scratch feature list), and never change what someone else
+  wrote.
+- **An issue someone else files is a lead**; a bug that affects users ranks
+  as one. Until the project adds issues by itself, `state.sh` lists the
+  ones "not in project": add each (`gh project item-add <number> --owner
+  <owner> --url <issue url>`). Ask in the issue when the report lacks what
+  a reproduction needs. Never close another person's issue without a commit
+  or the user's ruling.
+- **A question in Discussions** is the user's to answer; the loop cannot
+  post there. One that shows a bug or a gap in `docs/` is a lead.
 
 ## Evidence standards
 

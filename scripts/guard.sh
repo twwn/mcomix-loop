@@ -343,8 +343,9 @@ check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; of what reach
                   esac ;;
         project)  case "$act" in
                       list|view|item-list|field-list) return 0 ;;
-                      item-add|item-edit) shift 2; check_gh_project "$act" "$@"; return 0 ;;
+                      item-add|item-edit|field-create) shift 2; check_gh_project "$act" "$@"; return 0 ;;
                   esac ;;
+        label)    [ "$act" = list ] && return 0 ;;
         release)  case "$act" in list|view|download) return 0 ;; esac ;;
         repo)     [ "$act" = view ] && return 0 ;;
         workflow) case "$act" in list|view) return 0 ;; esac ;;
@@ -356,16 +357,16 @@ check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; of what reach
                 has " $* " ' --input[ =]| (-F|--field)[ =]?[A-Za-z_]+=@' \
                     && deny "gh api graphql: give the query inline (-f query='query { ... }'), so the guard can read it."
                 has "$raw_cmd" '(^|[^A-Za-z0-9_])mutation([^A-Za-z0-9_]|$)' \
-                    && deny "gh api graphql: a mutation writes to GitHub, which is the user's; the loop sends queries only."
+                    && deny "gh api graphql: a mutation writes to GitHub, which is the user's; the loop sends queries only, and writes through gh issue and gh project. Sub-issues: gh issue edit <n> --repo <ISSUES_REPO> --add-sub-issue <m> (or --remove-sub-issue), gh issue create --parent <n>."
                 return 0
             fi
             has " $* " ' (-X|--method)[ =]?(POST|PUT|PATCH|DELETE)| (-f|-F|--field|--raw-field|--input)[ =]' || return 0 ;;
     esac
-    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release, project: list and view; api GET; api graphql with a query) and writes only what state/config.sh allows (issues of ISSUES_REPO, items of ISSUES_PROJECT); the rest of what reaches GitHub is the user's."
+    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release, project, label: list and view; api GET; api graphql with a query) and writes only what state/config.sh allows (issues of ISSUES_REPO; items and fields of ISSUES_PROJECT); the rest of what reaches GitHub is the user's."
 }
 
 check_gh_issue() {   # $1: create|edit|comment|close|reopen, then its arguments
-    local act=$1 t v named=""
+    local act=$1 t v r named=""
     shift
     [ -n "$ISSUES_REPO" ] \
         || deny "gh issue $act: $STATE/config.sh names no ISSUES_REPO, so issues are the user's. Prepare the commands for the user under 'Questions for the user'."
@@ -377,6 +378,18 @@ check_gh_issue() {   # $1: create|edit|comment|close|reopen, then its arguments
             -R?*) v=${t#-R} ;;
             -p|--project|--project=*|--add-project|--add-project=*|--remove-project|--remove-project=*)
                 deny "gh issue $act $t: a project is named by its title here, which the guard cannot match to ISSUES_PROJECT; add the issue with 'gh project item-add <number> --owner <owner> --url <issue>'." ;;
+            --delete-last)
+                deny "gh issue comment --delete-last: what was posted is corrected (--edit-last), never deleted; the comment may be the user's own." ;;
+            --parent|--add-sub-issue|--remove-sub-issue|--duplicate-of|--parent=*|--add-sub-issue=*|--remove-sub-issue=*|--duplicate-of=*)
+                case "$t" in *=*) v=${t#*=}; t=${t%%=*} ;; *) v=${1:-}; shift ;; esac
+                for r in ${v//,/ }; do   # numbers, or URLs of issues in ISSUES_REPO
+                    case "$r" in
+                        [0-9]|[0-9]*[0-9]) [[ "$r" == *[!0-9]* ]] || continue ;;
+                        "https://github.com/$ISSUES_REPO/issues/"[0-9]*) [[ "${r##*/}" == *[!0-9]* ]] || continue ;;
+                    esac
+                    deny "gh issue $act $t $r: name an issue of $ISSUES_REPO (ISSUES_REPO) by its number or its URL."
+                done
+                continue ;;
             *) continue ;;
         esac
         [ "$v" = "$ISSUES_REPO" ] || deny "gh issue $act --repo $v: the loop writes only the issues of $ISSUES_REPO (ISSUES_REPO)."
@@ -385,11 +398,15 @@ check_gh_issue() {   # $1: create|edit|comment|close|reopen, then its arguments
     [ -n "$named" ] || deny "gh issue $act: name the repository, --repo $ISSUES_REPO; without it gh picks one from the checkout's remotes."
 }
 
-check_gh_project() {   # $1: item-add|item-edit, then its arguments
+check_gh_project() {   # $1: item-add|item-edit|field-create, then its arguments
     local act=$1 t v named="" owner=${ISSUES_PROJECT%/*} number=${ISSUES_PROJECT##*/}
     shift
     [ -n "$ISSUES_PROJECT" ] \
         || deny "gh project $act: $STATE/config.sh names no ISSUES_PROJECT, so projects are the user's. Prepare the commands for the user under 'Questions for the user'."
+    case " $* " in
+        *" --project-id "*|*" --project-id="*)
+            deny "gh project $act --project-id: a node ID the guard cannot match to ISSUES_PROJECT; name the project, the item and the field instead: 'gh project item-edit $number --owner $owner --url <issue url> --field Status --value \"In Progress\"'." ;;
+    esac
     [ "${1:-}" = "$number" ] \
         || deny "gh project $act: the project's number comes first, as 'gh project $act $number --owner $owner'; the loop writes only project $ISSUES_PROJECT (ISSUES_PROJECT)."
     shift
@@ -398,8 +415,6 @@ check_gh_project() {   # $1: item-add|item-edit, then its arguments
         case "$t" in
             --owner) v=${1:-}; shift ;;
             --owner=*) v=${t#--owner=} ;;
-            --project-id|--project-id=*)
-                deny "gh project $act --project-id: a node ID the guard cannot match to ISSUES_PROJECT; use 'gh project $act $number --owner $owner'." ;;
             *) continue ;;
         esac
         [ "$v" = "$owner" ] || deny "gh project $act --owner $v: the loop writes only project $ISSUES_PROJECT (ISSUES_PROJECT)."
