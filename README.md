@@ -61,7 +61,7 @@ Then:
 
    Three parts describe one installation. Adapt them:
 
-   - `config.sh` – set `WORKERS` to what you measure. `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file and update issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. Unset, it only reads GitHub.
+   - `config.sh` – set `WORKERS` to what you measure. `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. Unset, it writes nothing to GitHub.
    - `project.md` – replace the author's facts with yours: where your fork stands, how you release, which campaigns are finished.
    - `decisions/` – the author's rulings, one file each. Keep those tagged `program` if you build on this fork; they say why the program behaves as it does. Delete those tagged `installation`. Then confirm the ones you keep: `python3 scripts/okf.py confirm --as <you> state/decisions/*.md`.
 
@@ -102,7 +102,7 @@ At the second wakeup, `/context` shows the skill once, not twice.
 ## How it works
 
 - **`SKILL.md`** – the protocol. Its body is static, so it costs its tokens once per session and once after each compaction.
-- **`scripts/state.sh`** – the first command of every iteration. It prints the checkout and its branch, the tree, the commits since the notes' baseline, the notes and the names of the techniques.
+- **`scripts/state.sh`** – the first command of every iteration. It prints the checkout and its branch, the tree, the commits since the notes' baseline, the issues and discussions on GitHub, the notes and the names of the techniques.
 - **`scripts/gates.sh`** – runs the suite, then flake8 beside mypy, each with a hard timeout. It prints one line per gate.
 - **Exported trees** – `gates.sh --export` measures a clean `git archive`. Exports share one mypy cache, so mypy takes a second there, not half a minute.
 - **`guard.sh`** – PreToolUse hook. It enforces the never-rules. It notes each commit the loop makes, to know its own later.
