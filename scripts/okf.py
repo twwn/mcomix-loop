@@ -21,6 +21,8 @@ A source written `repo:<path>` is a file in the MComix checkout.
     okf.py rulings     the rulings, one line each, for the prompt
     okf.py index       (re)write the index.md files
     okf.py check       conformance; exit 1 and name each problem
+    okf.py state       what state.sh shows of the bundle, in one start-up:
+                       index, list, the probes named but missing, problems
     okf.py ruling --tag program|installation --title T --text T [--by ACTOR]
                        record a ruling (a new file; rulings are never edited)
     okf.py verified <technique>...   the loop re-checked these (machine tier)
@@ -234,9 +236,9 @@ def staleness(state):
 
 
 # ---------------------------------------------------------------- commands
-def cmd_list(state):
+def cmd_list(state, items=None):
     stale = staleness(state)
-    for slug, _, _, _, err in concepts(state, 'techniques'):
+    for slug, _, _, _, err in items if items is not None else concepts(state, 'techniques'):
         mark = ''
         if slug in stale:
             mark = ' [source gone]' if stale[slug][1] else ' [sources changed]'
@@ -305,7 +307,7 @@ def cmd_index(state, quiet=False):
         print(f'index: {len(tech)} techniques, {len(rul)} rulings')
 
 
-def cmd_check(state):
+def problems(state):
     problems = []
     for dirpath, dirnames, files in os.walk(state):
         rel = os.path.relpath(dirpath, state)
@@ -350,9 +352,33 @@ def cmd_check(state):
                     r = s.get('resource', '') if isinstance(s, dict) else ''
                     if not re.match(r'(repo:|https?://|/|\.)', r):
                         problems.append(f'{relp}: source without a resource URI: {s}')
-    for p in problems:
+    return problems
+
+
+def cmd_check(state):
+    found = problems(state)
+    for p in found:
         print(p)
-    return 1 if problems else 0
+    return 1 if found else 0
+
+
+def cmd_state(state):
+    cmd_index(state, quiet=True)
+    items = concepts(state, 'techniques')
+    if not items:
+        print('MISSING')
+    cmd_list(state, items)
+    named = set()
+    for _, path, _, _, _ in items:
+        with open(path, encoding='utf-8') as f:
+            named |= {m.rstrip('.') for m in re.findall(r'STATE/probes/[A-Za-z0-9_./-]+', f.read())}
+    missing = sorted(p for p in named if not os.path.exists(os.path.join(state, p[len('STATE/'):])))
+    if missing:
+        print('probes named but not on disk (rebuild from the description before use): ' + ' '.join(missing))
+    found = problems(state)
+    if found:
+        print('== bundle problems (fix before ending the iteration) ==')
+        print('\n'.join(found))
 
 
 def _slug(text, limit=48):
@@ -412,6 +438,8 @@ def main(argv):
         cmd_index(state)
     elif cmd == 'check':
         return cmd_check(state)
+    elif cmd == 'state':
+        cmd_state(state)
     elif cmd == 'ruling':
         cmd_ruling(state, argv[2:])
     elif cmd == 'verified':

@@ -142,9 +142,9 @@ Every iteration ends the same way, whatever it did.
    then end the iteration as usual. Nobody is watching the terminal: a
    question asked only in the report is lost, so it goes in `LOOP_NOTES`.
 
-The Stop hook refuses to end a turn whose gates ran after `LOOP_NOTES` was
-last written, or while `okf.py check` finds a broken concept: a net, not the
-plan.
+The Stop hook refuses to end a turn whose gates ran, in this session, after
+`LOOP_NOTES` was last written, or while `okf.py check` finds a broken
+concept: a net, not the plan.
 
 ## What an iteration is
 
@@ -215,7 +215,9 @@ The guard (`scripts/guard.sh`, a PreToolUse hook for this session) refuses
 what has gone wrong before - stash, push, amending anything but its own
 message, staging what you did not name, discarding or checking out what is
 the user's, rewriting history or the bundle, the user's real data, a gate
-without `timeout`, background commands - and names the rule when it does.
+without `timeout`, background commands, anything that writes to GitHub
+(`gh` reads: list and view, `api` GET, `api graphql` with an inline query)
+- and names the rule when it does.
 A refusal is not a puzzle to route around: do what the rule says.
 Everything below is judgment the guard cannot make.
 
@@ -365,7 +367,13 @@ their output: a count typed from memory has been wrong before.
 
 **A message the loop got wrong is corrected, the commit never.** The guard
 notes each commit the loop is about to make, its parent and subject, in
-`STATE/commits.log`. Its own newest commit (parent and subject noted there),
+`STATE/commits.log`. It reads the message before the command runs: the
+`-m`, the `-F` file, or the heredoc that writes that file earlier in the
+same command. A commit whose message it cannot read (a command
+substitution, a variable set outside the command, a file written some
+other way) is refused, since a commit not noted could never be amended:
+write the message file first, then `git commit -F /absolute/path` in a
+command of its own. Its own newest commit (parent and subject noted there),
 while nothing is on top of it and no remote branch contains it:
 `git commit --amend --only -F <file>` — message only, the tree stays as it
 is; the guard allows nothing else under `--amend`. Any other commit:

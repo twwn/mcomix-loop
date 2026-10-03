@@ -14,33 +14,37 @@
 #   printf '{"tool_name":"Bash","tool_input":{"command":"git log -3"},"cwd":"<checkout>"}' | guard.sh; echo $?   # 0
 
 set -u
-. "$(dirname "$0")/paths.sh"
+set -f   # tokens are compared as typed: `git add *` must reach the rule as `*`, not as the files it globs to
+case "$0" in */*) . "${0%/*}/paths.sh" ;; *) . ./paths.sh ;; esac
 
+# This runs before every Bash, Monitor, Write and Edit call, so it starts as
+# few processes as it can: one jq (or one python3) for the hook input, bash
+# itself for every pattern, and python3 again only for a commit.
 
 deny() { printf 'mcomix-loop guard: %s\n' "$1" >&2; exit 2; }
+has() { [[ "$1" =~ $2 ]]; }   # has <text> <extended regex>
 
-input=$(cat)
-json() {   # json <dotted.path>: a field of the hook input, empty when absent; jq, or python3 without it
-    local v
-    if command -v jq >/dev/null 2>&1 && v=$(printf '%s' "$input" | jq -r ".$1 // empty" 2>/dev/null); then
-        printf '%s' "$v"
-    else
-        printf '%s' "$input" | python3 -c 'import json, sys
+# The fields this guard reads, NUL-terminated: a command may hold newlines and tabs.
+if command -v jq >/dev/null 2>&1; then
+    fields() { jq -j '[.tool_name, .cwd, .tool_input.file_path, .tool_input.command, .tool_input.run_in_background]
+                      | map((. // "" | tostring) + "\u0000") | add' 2>/dev/null; }
+else
+    fields() { python3 -S -c 'import json, sys
 d = json.load(sys.stdin)
-for k in sys.argv[1].split("."):
-    d = d.get(k) if isinstance(d, dict) else None
-print("" if d in (None, False) else d if not isinstance(d, bool) else "true", end="")' "$1"
-    fi
-}
-tool=$(json tool_name)
-REPO=$(resolve_repo "$(json cwd)") \
-    || deny "this session's working directory is not an MComix checkout (mcomix/, test/, mcomix/constants.py); the loop only runs from inside one. Start claude there."
+t = d.get("tool_input") or {}
+v = [d.get("tool_name"), d.get("cwd"), t.get("file_path"), t.get("command"), t.get("run_in_background")]
+sys.stdout.write("".join(("true" if x is True else "" if x in (None, False) else str(x)) + "\0" for x in v))' 2>/dev/null; }
+fi
+{ IFS= read -r -d '' tool; IFS= read -r -d '' cwd; IFS= read -r -d '' path
+  IFS= read -r -d '' cmd; IFS= read -r -d '' bg; } < <(fields)
+
+REPO=$(resolve_repo "${cwd:-}") \
+    || deny "this session's working directory is not an MComix checkout (mcomix/, test/, mcomix/constants.py); the loop only runs from inside one. Start claude there. To work on the skill itself, start a session without /mcomix-loop."
 CAMPAIGN=$REPO/.claude/worktrees/campaign
 
 # ---------------------------------------------------------------- file tools
 case "$tool" in
     Write|Edit)
-        path=$(json tool_input.file_path)
         case "$path" in
             "$STATE"/index.md|"$TECHNIQUES"/index.md|"$DECISIONS"/index.md)
                 deny "index.md is generated from the concepts' frontmatter (okf.py index, run by state.sh); edit the concept instead." ;;
@@ -68,35 +72,57 @@ case "$tool" in
 esac
 
 # ------------------------------------------------------------ shell commands
-cmd=$(json tool_input.command)
 raw_cmd=$cmd
 [ -z "$cmd" ] && exit 0
-bg=$(json tool_input.run_in_background)
 [ "$bg" = true ] && deny "no background commands in the loop: a hang must surface as a timeout, not vanish into a background task."
 
 # Heredoc bodies are data (a commit message, a note being appended), not
 # commands: drop every line between a `<<WORD` and its terminator before the
 # text is inspected, keeping the line that carries the operator.
-cmd=$(printf '%s\n' "$cmd" | awk '
-    body == "" {
-        if (match($0, /<<-?[[:space:]]*["'"'"']?[A-Za-z_][A-Za-z0-9_]*["'"'"']?/)) {
-            d = substr($0, RSTART, RLENGTH); sub(/^<<-?[[:space:]]*/, "", d); gsub(/["'"'"']/, "", d)
-            body = d
+if [[ "$cmd" == *"<<"* ]]; then
+    cmd=$(printf '%s\n' "$cmd" | awk '
+        body == "" {
+            if (match($0, /<<-?[[:space:]]*["'"'"']?[A-Za-z_][A-Za-z0-9_]*["'"'"']?/)) {
+                d = substr($0, RSTART, RLENGTH); sub(/^<<-?[[:space:]]*/, "", d); gsub(/["'"'"']/, "", d)
+                body = d
+            }
+            print; next
         }
-        print; next
-    }
-    { line = $0; sub(/^\t+/, "", line); if (line == body) body = "" }
-')
-flat=$(printf '%s' "$cmd" | tr '\n\t' '  ' | tr -s ' ')
-# A quoted -m/--message argument with a space in it is a message, not a
-# command: blank it, so "xvfb-run" or "(a; b)" in a subject does not read as
-# a command. (A module name after python's -m has no space, and stays.)
-flat=$(printf '%s' "$flat" | sed -E "s/(-m|--message)(=|[[:space:]]+)(\"[^\"]* [^\"]*\"|'[^']* [^']*')/\1 MSG/g")
+        { line = $0; sub(/^\t+/, "", line); if (line == body) body = "" }
+    ')
+fi
+flat=${cmd//$'\n'/ }
+flat=${flat//$'\t'/ }
+while [[ "$flat" == *"  "* ]]; do flat=${flat//  / }; done
+# A quoted string with a space in it is text - a message, a pattern, a line
+# being written - not a command: blank it, so "mypy" or "(a; b)" in a
+# subject does not read as a command. What runs stays: the script of a
+# `-c` (sh, bash, python) or an `eval`, and a double-quoted string with a
+# command substitution in it. The checks for paths below see every string
+# but a commit message's (`data`).
+data=$flat
+if [[ "$flat" == *[\"\']* ]]; then
+    re_q="\"[^\"]*\"|'[^']*'"
+    rest=${flat//\\\"/__}; rest=${rest//\\\'/__}    # an escaped quote neither opens nor closes
+    flat=""; data=""
+    while [[ "$rest" =~ $re_q ]]; do
+        q=${BASH_REMATCH[0]}
+        pre=${rest%%"$q"*}
+        rest=${rest#*"$q"}
+        text=$q; message=$q
+        if [[ "$q" == *[[:space:]]* && ! ( "$q" == \"* && ( "$q" == *'$('* || "$q" == *'`'* ) ) ]]; then
+            has "$pre" '(^|[[:space:]])(-[a-zA-Z]*c|eval)[[:space:]]+$' || text=${q:0:1}MSG${q:0:1}
+            has "$pre" '(-m|--message)(=|[[:space:]]+)$' && message=${q:0:1}MSG${q:0:1}
+        fi
+        flat+=$pre$text; data+=$pre$message
+    done
+    flat+=$rest; data+=$rest
+fi
 
 for f in ${FOREIGN[@]+"${FOREIGN[@]}"}; do
-    case "$flat" in *"$f"*) deny "$f belongs to another session." ;; esac
+    case "$data" in *"$f"*) deny "$f belongs to another session." ;; esac
 done
-case "$flat" in
+case "$data" in
     *".config/mcomix"*|*".local/share/mcomix"*|*"recently-used.xbel"*)
         deny "real user data path in the command; every probe builds on test/__init__.py:MComixTest." ;;
 esac
@@ -109,14 +135,14 @@ esac
 # file, or that folds iteration.txt into LOOP_NOTES and then deletes
 # iteration.txt, is two separate acts and only the wrong one is refused.
 
+re_inplace='(^|[ ;&|(])(sed|perl)[[:space:]]+-[A-Za-z]*i|(^|[ ;&|(])truncate[[:space:]]'
+re_tee='(^|[ ;&|(])tee[[:space:]]'
+re_tee_append='tee[[:space:]]+(-[^ ]+[[:space:]]+)*(-a|--append)'
 check_appendonly() {   # $1: one segment, $2: an append-only file it names
     local seg=$1 f=$2 name=${2##*/}
-    printf '%s' "$seg" | grep -Eq "(^|[^>])>[[:space:]]*$f" \
-        && deny "$name is append-only; use '>>'."
-    printf '%s' "$seg" | grep -Eq '(^|[ ;&|(])(sed|perl)[[:space:]]+-[A-Za-z]*i|(^|[ ;&|(])truncate[[:space:]]' \
-        && deny "$name is append-only; no in-place edits or truncation."
-    if printf '%s' "$seg" | grep -Eq '(^|[ ;&|(])tee[[:space:]]' \
-       && ! printf '%s' "$seg" | grep -Eq 'tee[[:space:]]+(-[^ ]+[[:space:]]+)*(-a|--append)'; then
+    has "$seg" "(^|[^>])>[[:space:]]*$f" && deny "$name is append-only; use '>>'."
+    has "$seg" "$re_inplace" && deny "$name is append-only; no in-place edits or truncation."
+    if has "$seg" "$re_tee" && ! has "$seg" "$re_tee_append"; then
         deny "$name is append-only; 'tee' needs -a."
     fi
     # shellcheck disable=SC2206
@@ -150,40 +176,6 @@ check_rm() {   # $@: the tokens after 'rm'
     return 0
 }
 
-# The subject the commit this command makes will have: the first paragraph of
-# its first -m, of the -F file, or of the heredoc fed to -F -, joined as git's
-# %s joins it. Empty when it cannot be told.
-commit_subject() {
-    printf '%s' "$raw_cmd" | python3 -c '
-import re, shlex, sys
-raw = sys.stdin.read()
-m = re.search(r"<<-?\s*[\x27\x22]?(\w+)[\x27\x22]?[^\n]*\n(.*?)\n\s*\1\s*(\n|$)", raw, re.S)
-heredoc = m.group(2) if m else ""
-line = next((l for l in raw.split("\n") if re.search(r"\bcommit\b", l)), "")
-try:
-    toks = shlex.split(re.sub(r"<<-?\s*\S+", "", line))
-except ValueError:
-    sys.exit()
-msg = None
-toks = toks[toks.index("commit") + 1:] if "commit" in toks else []
-for i, t in enumerate(toks):
-    nxt = toks[i + 1] if i + 1 < len(toks) else ""
-    if t in ("-m", "--message"): msg = nxt
-    elif t.startswith("--message="): msg = t[10:]
-    elif t.startswith("-m") and len(t) > 2 and not t.startswith("--"): msg = t[2:]
-    elif t in ("-F", "--file") or t.startswith("--file="):
-        f = t[7:] if t.startswith("--file=") else nxt
-        if f == "-": msg = heredoc
-        else:
-            try: msg = open(f, encoding="utf-8", errors="replace").read()
-            except OSError: msg = None
-    if msg is not None: break
-if msg:
-    paras = re.split(r"\n\s*\n", msg.strip("\n"))
-    print(" ".join(paras[0].split()) if paras and paras[0].strip() else "")
-' 2>/dev/null
-}
-
 # ------------------------------------------------------------------- git
 check_git() {   # $@: the tokens after 'git'; $flat is in scope
     local sub="" t
@@ -211,7 +203,7 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
                 [ -n "${git_dir:-}" ] && target=$git_dir
                 head=$(git -C "$target" rev-parse -q --verify HEAD 2>/dev/null)
                 amend_help="Fix a message the loop got wrong: its own unpushed newest commit with 'git commit --amend --only -F <file>'; any other with 'git notes append -F <file> <commit>'."
-                printf '%s' "$args" | grep -Eq ' (--only|-o) ' || deny "git commit --amend changes only a message here, never content: add --only. $amend_help"
+                has "$args" ' (--only|-o) ' || deny "git commit --amend changes only a message here, never content: add --only. $amend_help"
                 [[ "$args" == *" -- "* ]] && deny "git commit --amend --only takes no paths: it corrects the message, not the tree. $amend_help"
                 own=""
                 if [ -n "$head" ] && [ -e "$COMMITS" ]; then
@@ -225,9 +217,9 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
                 [ -z "$(git -C "$target" branch -r --contains "$head" 2>/dev/null)" ] \
                     || deny "HEAD is on a remote branch already: pushed history is never rewritten. $amend_help"
             fi
-            printf '%s' "$args" | grep -Eq ' (-[a-zA-Z]*[aipect][a-zA-Z]*|--all|--interactive|--patch|--edit|--reedit-message|--template)( |=)' \
+            has "$args" ' (-[a-zA-Z]*[aipect][a-zA-Z]*|--all|--interactive|--patch|--edit|--reedit-message|--template)( |=)' \
                 && deny "git commit -a/-i/-p/-e/-c/-t: stages other people's changes or waits on an editor. Name the files you stage; pass the message with -m or -F."
-            printf '%s' "$args" | grep -Eq ' (-[a-zA-Z]*m|--message|-F|--file|-C|--reuse-message|--fixup|--squash|--no-edit)' \
+            has "$args" ' (-[a-zA-Z]*m|--message|-F|--file|-C|--reuse-message|--fixup|--squash|--no-edit)' \
                 || deny "git commit without -m or -F opens an editor, which hangs the loop."
             # Recorded before it runs: the parent it will sit on and the subject it
             # will have. That is how an amend later tells the loop's own commit
@@ -238,7 +230,8 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
             else
                 cparent=$(git -C "$ctarget" rev-parse -q --verify HEAD 2>/dev/null)
             fi
-            csubject=$(commit_subject)
+            csubject=$(printf '%s' "$raw_cmd" | python3 -S "$SKILL_DIR/scripts/commit-subject.py" "${cwd:-$REPO}")
+            [ $? -eq 3 ] && deny "the guard cannot read this commit's message before the command runs (a command substitution, a variable set outside this command, or a file this command writes other than by heredoc), so it cannot note the commit as the loop's, and a wrong message could never be amended. Write the message file first, then commit with 'git commit -F /absolute/path' in a command of its own."
             if [ -n "$cparent" ] && [ -n "$csubject" ]; then
                 mkdir -p "$(dirname "$COMMITS")"
                 printf '%s\t%s\n' "$cparent" "$csubject" >> "$COMMITS"
@@ -255,7 +248,7 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
         switch)
             deny "git switch: what is checked out is the user's; the loop works on files, or in its own worktree." ;;
         checkout|restore)
-            printf '%s' "$args" | grep -Eq ' (-b|-B|--orphan|--detach|-S|--staged) ' \
+            has "$args" ' (-b|-B|--orphan|--detach|-S|--staged) ' \
                 && deny "git $sub -b/-B/--orphan/--detach/--staged: what is checked out and what is staged are the user's."
             if [[ "$args" == *" -- "* ]]; then
                 local spec=${args##* -- }
@@ -268,20 +261,20 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
                 deny "git $sub <ref>: changes what the user has checked out. The sanctioned form restores a file: git checkout HEAD -- <file>."
             fi ;;
         reset)
-            printf '%s' "$args" | grep -Eq ' (--hard|--merge|--keep|--soft) ' \
+            has "$args" ' (--hard|--merge|--keep|--soft) ' \
                 && deny "git reset --hard/--merge/--keep/--soft discards or rewrites work."
             [[ "$args" == *" -- "* ]] || deny "git reset without a pathspec unstages or moves what the user has; use 'git reset -- <file>'." ;;
         clean)
             deny "git clean deletes other people's untracked files." ;;
         rebase)
-            printf '%s' "$args" | grep -Eq ' (-i|--interactive|--root) ' && deny "no interactive or root rebase."
+            has "$args" ' (-i|--interactive|--root) ' && deny "no interactive or root rebase."
             [[ "$flat" == *".claude/worktrees/campaign"* ]] || deny "git rebase only in the campaign worktree ($CAMPAIGN); nothing of the user's is rebased." ;;
         merge)
             [[ "$args" == *" --squash "* ]] || deny "a campaign lands as one squashed commit: git merge --squash loop/<campaign>." ;;
         branch)
-            printf '%s' "$args" | grep -Eq ' (-m|-M|--move|-c|-C|--copy|-f|--force|-u|--set-upstream-to|--unset-upstream|--edit-description) ' \
+            has "$args" ' (-m|-M|--move|-c|-C|--copy|-f|--force|-u|--set-upstream-to|--unset-upstream|--edit-description) ' \
                 && deny "git branch rename/force/upstream: branches other sessions may have are not touched."
-            if printf '%s' "$args" | grep -Eq ' (-[a-zA-Z]*[dD][a-zA-Z]*|--delete) '; then
+            if has "$args" ' (-[a-zA-Z]*[dD][a-zA-Z]*|--delete) '; then
                 for tok in "$@"; do
                     case "$tok" in
                         -*|loop/*) ;;
@@ -297,26 +290,26 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
                     deny "git worktree: worktrees you did not create are not yours to touch (prune/move/lock/unlock/repair)." ;;
             esac ;;
         tag)
-            [ $# -eq 0 ] || printf '%s' "$args" | grep -Eq ' (-l|--list|-n[0-9]*) ' \
+            [ $# -eq 0 ] || has "$args" ' (-l|--list|-n[0-9]*) ' \
                 || deny "git tag: releases are the user's." ;;
         remote)
-            [ $# -eq 0 ] || printf '%s' "$args" | grep -Eq ' (-v|show|get-url) ' \
+            [ $# -eq 0 ] || has "$args" ' (-v|show|get-url) ' \
                 || deny "git remote: remotes are the user's." ;;
         config)
-            printf '%s' "$args" | grep -Eq ' (--get|--get-all|--get-regexp|--list|-l) ' \
+            has "$args" ' (--get|--get-all|--get-regexp|--list|-l) ' \
                 || deny "git config writes are the user's; read with --get or --list." ;;
         reflog)
-            printf '%s' "$args" | grep -Eq ' (expire|delete|drop) ' && deny "git reflog expire/delete: history is not pruned." ;;
+            has "$args" ' (expire|delete|drop) ' && deny "git reflog expire/delete: history is not pruned." ;;
         gc|prune|filter-branch|filter-repo|replace|update-ref|symbolic-ref|commit-tree|fast-import|submodule)
             deny "git $sub: history and repository state are the user's." ;;
         revert)
             [[ "$args" == *" --no-edit "* ]] || deny "git revert without --no-edit opens an editor." ;;
         cherry-pick)
-            printf '%s' "$args" | grep -Eq ' (-e|--edit) ' && deny "git cherry-pick -e opens an editor." ;;
+            has "$args" ' (-e|--edit) ' && deny "git cherry-pick -e opens an editor." ;;
         notes)
             case " $* " in
                 *" append "*)
-                    printf '%s' " $* " | grep -Eq ' (-m|-F|--message|--file)' \
+                    has " $* " ' (-m|-F|--message|--file)' \
                         || deny "git notes append without -m or -F opens an editor." ;;
                 *" show "*|*" list "*|" "|"  ") ;;
                 *) deny "git notes: only 'append' (with -m or -F), 'show' and 'list'; a note is never removed or rewritten." ;;
@@ -342,47 +335,93 @@ check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; anything that
         release)  case "$act" in list|view|download) return 0 ;; esac ;;
         repo)     [ "$act" = view ] && return 0 ;;
         workflow) case "$act" in list|view) return 0 ;; esac ;;
-        api)      printf '%s' " $* " | grep -Eq ' (-X|--method)[ =]?(POST|PUT|PATCH|DELETE)| (-f|-F|--field|--raw-field|--input)[ =]' || return 0 ;;
+        api)
+            if [ "$act" = graphql ]; then
+                # Always a POST, but a query only reads: some reads (Discussions
+                # categories) exist only there. The query is read from the raw
+                # command, since quoted text is blanked above.
+                has " $* " ' --input[ =]| (-F|--field)[ =]?[A-Za-z_]+=@' \
+                    && deny "gh api graphql: give the query inline (-f query='query { ... }'), so the guard can read it."
+                has "$raw_cmd" '(^|[^A-Za-z0-9_])mutation([^A-Za-z0-9_]|$)' \
+                    && deny "gh api graphql: a mutation writes to GitHub, which is the user's; the loop sends queries only."
+                return 0
+            fi
+            has " $* " ' (-X|--method)[ =]?(POST|PUT|PATCH|DELETE)| (-f|-F|--field|--raw-field|--input)[ =]' || return 0 ;;
     esac
-    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release: list and view; api GET); what reaches GitHub is the user's."
+    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release: list and view; api GET; api graphql with a query); what reaches GitHub is the user's."
 }
 
 # Split on command separators and substitutions; inspect every segment.
-mapfile -t segs < <(printf '%s\n' "$flat" | sed -E 's/(&&|\|\||;|\||\$\(|`|\(|\))/\n/g')
+nl=$'\n'
+split=${flat//&&/$nl}; split=${split//||/$nl}; split=${split//;/$nl}; split=${split//|/$nl}
+split=${split//\$(/$nl}; split=${split//\`/$nl}; split=${split//(/$nl}; split=${split//)/$nl}
+mapfile -t segs <<< "$split"
 outer_timeout=0
-printf '%s' "${segs[0]}" | grep -Eq '(^|[[:space:]])timeout[[:space:]].*[[:space:]](sh|bash|dash|zsh)[[:space:]]+(-[a-z]*c)' && outer_timeout=1
+has "${segs[0]}" '(^|[[:space:]])timeout[[:space:]].*[[:space:]](sh|bash|dash|zsh)[[:space:]]+(-[a-z]*c)' && outer_timeout=1
 for seg in "${segs[@]}"; do
+    # Words as the shell passes them on, quotes removed: `bash -c 'git push'`
+    # runs git, and `git add '*'` stages everything.
     # shellcheck disable=SC2206
-    toks=($seg)
+    toks=(${seg//[\"\']/})
     [ ${#toks[@]} -eq 0 ] && continue
 
     [[ "$seg" == *"$REJECTED"* ]] && check_appendonly "$seg" "$REJECTED"
     if [[ "$seg" == *"$TECHNIQUES/"* ]]; then
-        tf=$(printf '%s' "$seg" | grep -oE "$TECHNIQUES/[A-Za-z0-9_.-]+\.md" | head -1)
-        [ -n "$tf" ] && [ -e "$tf" ] && check_appendonly "$seg" "$tf"
+        if has "$seg" "$TECHNIQUES/[A-Za-z0-9_.-]+\.md"; then
+            tf=${BASH_REMATCH[0]}
+            [ -e "$tf" ] && check_appendonly "$seg" "$tf"
+        fi
     fi
-    if [[ "$seg" == *"$DECISIONS"* ]] && printf '%s' "$seg" | grep -Eq "(>|tee|sed|perl|truncate|cp|mv|install)[^|;&]*$DECISIONS"; then
+    if [[ "$seg" == *"$DECISIONS"* ]] && has "$seg" "(>|tee|sed|perl|truncate|cp|mv|install)[^|;&]*$DECISIONS"; then
         deny "rulings are written only by okf.py ruling, and never changed."
     fi
     case "$seg" in
         *okf.py*" confirm"*) deny "confirming a ruling is the user's (okf.py confirm, from their own terminal)." ;;
     esac
-    if [[ "$seg" == *"$COMMITS"* ]] && printf '%s' "$seg" | grep -Eq "(>|tee|sed|perl|truncate|cp|mv|install|rm)[^|;&]*$COMMITS"; then
+    if [[ "$seg" == *"$COMMITS"* ]] && has "$seg" "(>|tee|sed|perl|truncate|cp|mv|install|rm)[^|;&]*$COMMITS"; then
         deny "commits.log is written only by the guard, as it lets a commit through."
     fi
 
     # Suite, probes and mypy carry their own timeout; the tool's timeout hides a hang.
-    # (Limitation: a bare token "xvfb-run" in a grep pattern still trips this.)
-    needs_timeout=0; has_timeout=$outer_timeout
+    # What runs is the command word, past the wrappers that start another
+    # command (assignments, env, nice, timeout, xvfb-run, a shell's -c); the
+    # same word as an argument, a pattern or a file name runs nothing.
+    needs_timeout=0; has_timeout=$outer_timeout; wrapper=""
     for ((i = 0; i < ${#toks[@]}; i++)); do
-        case "${toks[$i]}" in
-            timeout) has_timeout=1 ;;
-            xvfb-run) needs_timeout=1 ;;
-            -m) nxt=${toks[$((i + 1))]:-}; case "${nxt//[\"\']/}" in pytest|mypy) needs_timeout=1 ;; esac ;;
-            *gates.sh) needs_timeout=0; has_timeout=1 ;;
+        t=${toks[i]//[\"\']/}
+        case "$t" in
+            [A-Za-z_]*=*) continue ;;
+            env|*/env) wrapper=env; continue ;;
+            nice|*/nice) wrapper=nice; continue ;;
+            nohup|stdbuf|exec|command|time) wrapper=other; continue ;;
+            timeout|*/timeout) wrapper=timeout; has_timeout=1; continue ;;
+            xvfb-run|*/xvfb-run) wrapper=xvfb-run; needs_timeout=1; continue ;;
+            sh|bash|dash|zsh|*/sh|*/bash|*/dash|*/zsh) wrapper=shell; continue ;;
+            -*)
+                case "$wrapper $t" in
+                    "env -u"|"env -C"|"env -S"|"nice -n"|"timeout -k"|"timeout -s"|"xvfb-run -"[nsefpw]) ((i++)) ;;
+                esac
+                [ -n "$wrapper" ] && continue ;;
+            *)
+                if [ "$wrapper" = timeout ] && [[ "$t" =~ ^[0-9.]+[smhd]?$ ]]; then wrapper=other; continue; fi ;;
         esac
+        break
     done
-    case "${toks[0]}" in pytest|*/pytest|mypy|*/mypy) needs_timeout=1 ;; esac
+    word=${toks[i]:-}; word=${word//[\"\']/}
+    case "$word" in
+        pytest|*/pytest|mypy|*/mypy) needs_timeout=1 ;;
+        python|python3|python3.*|*/python|*/python3|*/python3.*)
+            for ((j = i + 1; j < ${#toks[@]}; j++)); do
+                a=${toks[j]//[\"\']/}
+                case "$a" in
+                    -m) a=${toks[j + 1]:-}; case "${a//[\"\']/}" in pytest|mypy) needs_timeout=1 ;; esac; break ;;
+                    -mpytest|-mmypy) needs_timeout=1; break ;;
+                    -W|-X) ((j++)) ;;
+                    -*) ;;
+                    *) break ;;
+                esac
+            done ;;
+    esac
     if [ "$needs_timeout" -eq 1 ] && [ "$has_timeout" -eq 0 ]; then
         deny "wrap it in 'timeout -k 5 <seconds>' (60 for the suite or a probe, 120 for mypy), or use gates.sh; the tool's own timeout backgrounds a hang instead of surfacing it."
     fi

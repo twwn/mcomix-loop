@@ -1,14 +1,17 @@
 """How much does each opened and closed archive editor keep alive, and
 through what?  Built on MComixTest; run under xvfb-run with a timeout.
+
+Its counts include the main window sidebar's ThumbnailItems, and its wait
+for the editor's pages returns at once: verify/probe_editor_leak2.py
+counts the editor's items apart and waits on the grid's store.
 """
 import gc
 import os
 import sys
 import unittest
 
-sys.path.insert(0, '/tmp/mcomix-git')
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 
-import test  # noqa: E402
 from test import MComixTest, get_testfile_path, pump, wait_for  # noqa: E402
 
 from mcomix import constants, edit_dialog, icons, main  # noqa: E402

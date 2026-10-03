@@ -81,6 +81,8 @@
 ## Translations and documentation
 
 * [Documentation: where it lives and what checks it](documentation-where-it-lives-and-what-checks-it.md)
+* [GitHub Pages: building the site locally](github-pages-building-the-site-locally.md)
 * [Mnemonics, per language](mnemonics-per-language.md)
 * [Plural forms](plural-forms.md)
 * [Translations: template, catalogues, merging](translations-template-catalogues-merging.md)
+* [Upstream SourceForge tickets: reading them](upstream-sourceforge-tickets-reading-them.md)

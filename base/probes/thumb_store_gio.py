@@ -1,6 +1,6 @@
 """Does GIO accept the archive thumbnails MComix writes into the shared store?"""
-import os, sys, zipfile
-sys.path.insert(0, '/tmp/mcomix-git')
+import os, shutil, sys, zipfile
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 from test import MComixTest, get_testfile_path
 from gi.repository import Gio
 from mcomix import thumbnail_tools
@@ -18,7 +18,6 @@ class Probe(MComixTest):
                 with zipfile.ZipFile(src, 'w') as z:
                     z.write(get_testfile_path('images', 'landscape-exif-270-rotation.jpg'), '01.jpg')
             else:
-                import shutil
                 shutil.copy(get_testfile_path('images', 'landscape-exif-270-rotation.jpg'), src)
             t = thumbnail_tools.Thumbnailer(dst_dir=os.path.join(cache, 'thumbnails', 'normal'),
                                             store_on_disk=True, archive_support=True, size=(128, 128))

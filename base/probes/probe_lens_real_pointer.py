@@ -2,7 +2,7 @@
 turn and a scroll made without moving the pointer?"""
 import os, sys, unittest, subprocess, time
 from gi.repository import Graphene
-sys.path.insert(0, '/tmp/mcomix-git')
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 from test import MComixTest, get_testfile_path, pump, wait_for
 from mcomix import constants, icons, main
 from mcomix.preferences import prefs

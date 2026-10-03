@@ -8,9 +8,8 @@ import shutil
 import sys
 import unittest
 
-sys.path.insert(0, '/tmp/mcomix-git')
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 
-import test  # noqa: E402
 from test import MComixTest, get_testfile_path, pump, wait_for  # noqa: E402
 
 from mcomix import constants, icons, main  # noqa: E402
@@ -18,7 +17,7 @@ from mcomix.library import main_dialog  # noqa: E402
 
 CYCLES = int(os.environ.get('CYCLES', '5'))
 BOOKS = int(os.environ.get('BOOKS', '0'))
-SOURCE = os.environ.get('BOOK', '/tmp/mcomix-loop-scratch/big60.cbz')
+SOURCE = os.environ.get('BOOK') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'big60.cbz')
 
 
 def rss_kib():
@@ -53,7 +52,6 @@ class Probe(MComixTest):
                     paths.append(path)
                 main_dialog.open_dialog(None, window)
                 pump()
-                main_dialog._dialog.backend.add_book  # noqa: B018
                 for path in paths:
                     main_dialog._dialog.backend.add_book(path)
                 main_dialog._close_dialog()

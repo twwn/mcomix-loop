@@ -1,3 +1,9 @@
+"""How many worker processes the native PDF handler leaves behind.
+
+Usage, from the checkout: python3 pdf_workers.py <scratch dir>
+Builds a three-page PDF there, reads its details five times in a row and
+then ten times at once, and prints the descendant process count after each.
+"""
 import gi, os, sys, gc, time, threading
 sys.path.insert(0, os.getcwd())
 gi.require_version('Gtk', '4.0')
@@ -52,4 +58,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-    sys.exit(0)
+    sys.stdout.flush()
+    os._exit(0)

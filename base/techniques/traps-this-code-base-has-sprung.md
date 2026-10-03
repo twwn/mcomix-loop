@@ -9,7 +9,7 @@ sources:
   - { resource: "repo:test/test_windows_build.py" }
   - { resource: "repo:mcomix/file_actions.py" }
   - { resource: "repo:test/test_archives.py" }
-generated: { by: mcomix-loop/claude, at: "2026-09-26T20:28:34+02:00" }
+generated: { by: mcomix-loop/claude-opus-5-5, at: "2026-10-03T05:23:40Z" }
 ---
 
 - **Pillow's ImageOps.invert() raises on RGBA** ("not supported for mode RGBA") and autocontrast() takes only L and RGB. Anything with an alpha channel that reaches `image_tools.enhance()` - a transparent page's thumbnail, an uncomposited placeholder - has its alpha set aside since 9319c063. `fit_in_rectangle()` composites onto the checkerboard, so what it returns is opaque; what skips it is not.
@@ -28,3 +28,4 @@ generated: { by: mcomix-loop/claude, at: "2026-09-26T20:28:34+02:00" }
 - In test_archives.py the handler module `zip` shadows the builtin zip(); iterate by index there.
 - **An action activated in `MainWindow.__init__` that needs a book is ignored** (a416733d): the book the command line names is read in the background and the action is insensitive until file_opened, so a start-up activation of such an action waits for file_opened. Two traps met there: a `Callback` listener must not remove itself while it is being called (`CallbackList.__run_callbacks` iterates the live list, so the next listener is skipped) - use a one-shot flag instead; and a radio choice's `get_active()` warns "g_variant_get_boolean: assertion" and answers False - read its preference instead. Fullscreen is never granted under Xvfb (no window manager): test window_state_event() by patching `type(window).is_fullscreen` and calling it directly.
 - **Pillow's own exceptions are not all OSErrors** (d69e8bd3): `ImageCms.PyCMSError` and `Image.DecompressionBombError` derive from Exception alone (Pillow 10.1 and 12.3); `UnidentifiedImageError` is an OSError. A handler that catches OSError around ImageCms or Image.open lets the first two through. Check with `python3 -c "from PIL import ImageCms; print(ImageCms.PyCMSError.__mro__)"`. A loader that raises inside `_first_provider_that_loads` is passed over silently (debug "provider 1 failed"), so such a bug shows as a slower gdk-pixbuf fallback, not as an error.
+- (at a28c609a) **GLib's user directories inside the suite are the real ones**: GLib reads XDG_DATA_HOME and friends once per process, before any MComixTest sets them, so `GLib.get_user_data_dir()` in a test answers /home/<user>/.local/share. Anything that goes through GLib's own directories - Gio.File.trash(), a GTK store with a default location - reaches the real home unless the test base pins or replaces it (RecentManager is pinned; tools.move_to_trash is replaced by a move into the test's trash_dir).

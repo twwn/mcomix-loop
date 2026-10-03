@@ -28,6 +28,8 @@
 * [The source archive is .tar.xz](2026-09-26-the-source-archive-is-tar-xz.md) - unconfirmed
 * [The Windows build ships MComix.exe alone](2026-09-26-the-windows-build-ships-mcomix-exe-alone.md) - unconfirmed
 * [26.09's notes link to 4.0.1 and 4.0.0](2026-09-27-26-09-s-notes-link-to-4-0-1-and-4-0-0.md) - unconfirmed
+* [Do every small, medium and large feature request; reorganise Preferences if needed](2026-10-03-do-every-small-medium-and-large-feature-request.md) - unconfirmed
+* [Windows: an open book does not hold its archive](2026-10-03-windows-an-open-book-does-not-hold-its-archive.md) - unconfirmed
 
 ## How this installation works
 
@@ -41,3 +43,15 @@
 * [The loop reads the CI's results itself](2026-09-26-the-loop-reads-the-ci-s-results-itself.md) - unconfirmed
 * [The loop corrects its own commit messages, never the commits](2026-09-27-the-loop-corrects-its-own-commit-messages-never.md) - unconfirmed
 * [Windows slowness waits; other work first](2026-09-27-windows-slowness-waits-other-work-first.md) - unconfirmed
+* [A custom social preview image](2026-10-03-a-custom-social-preview-image.md) - unconfirmed
+* [Campaign: a closed MainWindow is collectable](2026-10-03-campaign-a-closed-mainwindow-is-collectable.md) - unconfirmed
+* [Changelog entries link their SourceForge tickets](2026-10-03-changelog-entries-link-their-sourceforge-tickets.md) - unconfirmed
+* [Discussions are on; questions go there](2026-10-03-discussions-are-on-questions-go-there.md) - unconfirmed
+* [GitHub Pages serves the manual](2026-10-03-github-pages-serves-the-manual.md) - unconfirmed
+* [Land the MainWindow campaign](2026-10-03-land-the-mainwindow-campaign.md) - unconfirmed
+* [No CODE_OF_CONDUCT.md](2026-10-03-no-code-of-conduct-md.md) - unconfirmed
+* [No wiki; the manual stays in docs/](2026-10-03-no-wiki-the-manual-stays-in-docs.md) - unconfirmed
+* [PNGs go through pngquant, SVGs through svgo](2026-10-03-pngs-go-through-pngquant-svgs-through-svgo.md) - unconfirmed
+* [Release notes follow ChangeLog.md by workflow](2026-10-03-release-notes-follow-changelog-md-by-workflow.md) - unconfirmed
+* [Windows tests run on every push](2026-10-03-windows-tests-run-on-every-push.md) - unconfirmed
+* [Windows tests stay off the push trigger](2026-10-03-windows-tests-stay-off-the-push-trigger.md) - unconfirmed

@@ -10,7 +10,6 @@ Checks, over random values:
     answer lying inside (or holding) what it was made from.
 Prints one line per property with the number of mismatches.
 """
-import itertools
 import random
 import sys
 

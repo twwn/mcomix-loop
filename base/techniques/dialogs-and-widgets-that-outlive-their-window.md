@@ -4,7 +4,7 @@ title: Dialogs and widgets that outlive their window
 tags: [gtk]
 sources:
   - { resource: "repo:test/test_dialog_freed.py" }
-generated: { by: mcomix-loop/claude, at: "2026-09-20T20:06:44+02:00" }
+generated: { by: mcomix-loop/claude-opus-5-5, at: "2026-10-03T01:24:16Z" }
 ---
 
 - **GTK 4 does not dispose a destroyed window's widget tree.** `gtk_window_destroy()` hides, unrealizes and drops GTK's own reference; the children stay parented.  A child widget's C reference from its parent makes PyGObject's toggle reference strong, so its wrapper and the closures connected to it are roots to Python's GC, and a closure holding a bound method of the dialog keeps the dialog alive. `Gtk.CallbackAction.new(self._x)` is worse: it holds the callable through a destroy-notify, which PyGObject never traverses (Dialog's Escape shortcut, the archive editor's undo and redo).
@@ -19,3 +19,4 @@ generated: { by: mcomix-loop/claude, at: "2026-09-20T20:06:44+02:00" }
 - **A GObject whose wrapper is gone still holds its Python handlers, and nothing traverses them.**  A `Gio.SimpleAction` created, connected and added to a group, with no Python reference kept, makes its handler a GC root for as long as the group lives.  Taking the group off the widget is enough only when nothing else keeps the group; an area that also keeps it as an attribute has to empty it (`widgets.empty_action_group`).
 - **A list view keeps cells aside for rows to come, outside the widget tree**, so a sweep of the tree misses their controllers.  The views track what their factories built in a `weakref.WeakSet` and cut those cells' handlers in `release()` (`widgets.cut_handlers`).
 - **Tracing a survivor**: gc.get_objects() filtered by type name, then walk gc.get_referrers() a few levels, skipping frames, iterators and the referrer lists the walk itself made; print `__grefcount__` of each GObject met.  A wrapper at g1 is weak and collectable; one at g2+ is a root (something in C holds its object), and the chain ends where a bound method has no Python referrer: its closure is held in C.
+- (at bb40e7c6, campaign branch) **release() need not enter a menu built from a model**: GTK builds its items; MComix connects only watch_menu_clicks' gestures there, whose lambda holds nothing. Skipping those subtrees cut release() from 10 ms to about 1 ms for a main window, and test_dialog_freed and test_main_window_freed still pass.

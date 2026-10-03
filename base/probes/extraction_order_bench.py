@@ -1,8 +1,12 @@
-import sys, time
-sys.path.insert(0, '.')
+"""What ImageHandler._ask_for_pages() costs per page turn, by book size.
+
+Run from the checkout: 100 turns spread over books of 200, 2,000 and
+10,000 pages, no window and no extraction.
+"""
+import os, sys, time
+sys.path.insert(0, os.getcwd())
 from test import MComixTest  # noqa: redirects constants
 from mcomix import callback, image_handler
-from mcomix.preferences import prefs
 class FH:
     archive_type = None; file_loaded = False
     @callback.Callback
@@ -19,4 +23,4 @@ for n in (200, 2000, 10000):
     for page in range(1, 101): h._ask_for_pages(page * n // 101 + 1)
     print(n, 'pages: %.3f ms per turn' % ((time.perf_counter() - t0) * 10))
 h.cleanup(); t.tearDown()
-import os; sys.stdout.flush(); os._exit(0)
+sys.stdout.flush(); os._exit(0)

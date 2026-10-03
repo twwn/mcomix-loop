@@ -6,6 +6,7 @@ where FORMS gives the language's own; the obsolete entry is dropped.
 Usage: python3 fill_plural_from_obsolete.py OLD_MSGID NEW_MSGID catalogue.po...
 FORMS is edited for the message at hand.
 """
+import ast
 import re
 import sys
 
@@ -24,7 +25,7 @@ def po_string(text):
 
 
 def unquote(lines):
-    return ''.join(eval(line) for line in lines)
+    return ''.join(ast.literal_eval(line) for line in lines)
 
 
 old_id, new_id = sys.argv[1], sys.argv[2]

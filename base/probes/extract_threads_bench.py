@@ -17,7 +17,6 @@ import tempfile
 import time
 
 def main():
-    global work, prefs, archive_extractor
     work = os.path.abspath(sys.argv[1])
     pages = int(sys.argv[2]) if len(sys.argv) > 2 else 120
     os.makedirs(work, exist_ok=True)
@@ -79,7 +78,6 @@ def main():
     paths['pdf'] = pdf
     print('pages', len(names), 'MB', round(sum(os.path.getsize(os.path.join(src, n)) for n in names) / 1e6))
 
-
     def unpack(path, threads):
         prefs['max extract threads'] = threads
         dst = tempfile.mkdtemp(dir=work)
@@ -102,20 +100,19 @@ def main():
         shutil.rmtree(dst)
         return took, handler
 
-
     for kind, path in paths.items():
         if ONLY and kind not in ONLY:
             continue
         row = []
         handler = ''
         for threads in (1, 2, 4, 8):
-            best = min(unpack(path, threads)[0] for _run in range(3))
-            handler = unpack(path, threads)[1]
+            runs = [unpack(path, threads) for _run in range(3)]
+            best = min(took for took, _handler in runs)
+            handler = runs[0][1]
             row.append('%d:%.2fs' % (threads, best))
         print('%-10s %-16s' % (kind, handler), ' '.join(row), flush=True)
     sys.stdout.flush()
     os._exit(0)
-
 
 
 if __name__ == '__main__':

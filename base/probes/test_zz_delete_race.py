@@ -5,7 +5,6 @@ still removing the book's temporary directory while MComixTest removes
 the test's.
 """
 import os
-import random
 import shutil
 import tempfile
 import threading

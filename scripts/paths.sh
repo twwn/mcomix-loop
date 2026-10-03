@@ -19,7 +19,13 @@
 # is_gtk4 <dir>: the loop targets the GTK4 port; upstream 3.x is GTK3 and
 # every rule about widgets, deprecations and dependencies would be wrong there.
 
-SKILL_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# Every hook and tool command calls the scripts by absolute path; only a
+# relative call (a script run by hand) pays for the subshell.
+SKILL_DIR=${BASH_SOURCE[0]%/*}
+case "$SKILL_DIR" in
+    /*/scripts) SKILL_DIR=${SKILL_DIR%/scripts} ;;
+    *) SKILL_DIR=$(cd "$SKILL_DIR/.." && pwd) ;;
+esac
 STATE=$SKILL_DIR/state
 NOTES=$STATE/notes.md
 TECHNIQUES=$STATE/techniques
@@ -27,11 +33,10 @@ DECISIONS=$STATE/decisions
 REJECTED=$STATE/rejected.md
 COMMITS=$STATE/commits.log
 SCRATCH=$STATE/scratch
-OKF="python3 $SKILL_DIR/scripts/okf.py"
+OKF="python3 -S $SKILL_DIR/scripts/okf.py"   # -S: stdlib only, and site's start-up is two thirds of its run
 
-# Per-installation settings, overridable in $STATE/config.sh (see
-# config.example.sh at the top level; the guard treats that file as the
-# user's, not the loop's).
+# Per-installation settings, overridable in $STATE/config.sh (seeded from
+# base/config.sh; the guard treats that file as the user's, not the loop's).
 WORKERS=8          # pytest-xdist workers; measure it, -n auto is slower on a short suite
 T_PYTEST=60        # seconds; the suite and any probe
 T_FLAKE8=60
@@ -53,11 +58,16 @@ is_gtk4() {
 
 # resolve_repo [dir]: the checkout's top level, from the first of: the
 # argument, $CLAUDE_PROJECT_DIR (set for hooks), $PWD. Prints it, or fails.
+# The top level is the nearest directory upwards with a .git, found without
+# starting git: the guard runs this on every tool call.
 resolve_repo() {
     local d top
     for d in "${1:-}" "${CLAUDE_PROJECT_DIR:-}" "$PWD"; do
         [ -n "$d" ] || continue
-        top=$(git -C "$d" rev-parse --show-toplevel 2>/dev/null) || continue
+        case "$d" in /*) ;; *) d=$PWD/$d ;; esac
+        top=${d%/}
+        until [ -e "$top/.git" ] || [ -z "$top" ]; do top=${top%/*}; done
+        [ -n "$top" ] || continue
         # A campaign worktree resolves to itself; walk up to the main checkout.
         case "$top" in */.claude/worktrees/*) top=${top%%/.claude/worktrees/*} ;; esac
         if is_mcomix "$top"; then printf '%s\n' "$top"; return 0; fi

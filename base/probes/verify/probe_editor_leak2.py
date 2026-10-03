@@ -1,6 +1,6 @@
 """Copy of ../probe_editor_leak.py with its counting checked.
 
-Differences: the tree is TREE (not hard-wired /tmp/mcomix-git); a
+Differences: the tree is TREE (the original was hard-wired to one); a
 baseline before the first editor; ThumbnailItems split into the editor's
 (uid is a path) and the main window sidebar's (uid is a page number);
 the wait for pages uses grid.store (the grid has no get_n_items, so the

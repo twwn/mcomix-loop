@@ -10,7 +10,7 @@ import os
 _n = [0]
 _total = int(os.environ.get('QUARTER', '55'))
 _prof = {'first': cProfile.Profile(), 'last': cProfile.Profile()}
-_out = os.path.expanduser('~/.claude/skills/mcomix-loop/state/scratch/prof_%s.out')
+_out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scratch', 'prof_%s.out')
 
 
 def _which():
@@ -25,10 +25,6 @@ def pytest_runtest_setup(item):
     which = _which()
     if which:
         _prof[which].enable()
-
-
-def pytest_runtest_teardown(item, nextitem):
-    pass
 
 
 def pytest_runtest_logreport(report):

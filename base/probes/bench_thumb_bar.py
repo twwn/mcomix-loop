@@ -1,11 +1,17 @@
 # Thumbnails of the 60 pages of big60.cbz at 128x128, as the thumbnail
 # bar asks for them, without storing them on disk. Best of three passes.
-import glob, os, sys, time
-sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else '/tmp/mcomix-git')
+# Usage: python3 bench_thumb_bar.py [<mcomix tree>]  (default: the working
+# directory). The pages are unpacked once into STATE/scratch/thumbbench/pages.
+import glob, os, sys, time, zipfile
+sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else os.getcwd())
 import gi
 gi.require_version('Gdk', '4.0'); gi.require_version('Gtk', '4.0'); gi.require_version('GdkPixbuf', '2.0')
 from mcomix import thumbnail_tools
-pages = sorted(glob.glob(os.path.expanduser('~/.claude/skills/mcomix-loop/state/scratch/thumbbench/pages/*.jpg')))
+HERE = os.path.dirname(os.path.abspath(__file__))
+PAGES = os.path.join(os.path.dirname(HERE), 'scratch', 'thumbbench', 'pages')
+if not glob.glob(os.path.join(PAGES, '*.jpg')):
+    zipfile.ZipFile(os.path.join(HERE, 'big60.cbz')).extractall(PAGES)
+pages = sorted(glob.glob(os.path.join(PAGES, '*.jpg')))
 best = None
 for _ in range(3):
     t = time.perf_counter()
