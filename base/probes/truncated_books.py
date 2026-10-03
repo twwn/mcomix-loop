@@ -1,5 +1,9 @@
+"""Every truncation of a two-image MOBI book: where MobiArchive fails, and how.
+
+Run from the checkout on MComixTest; prints a count per (stage, exception).
+"""
 import collections, os, sys
-sys.path.insert(0, '/tmp/mcomix-git')
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 from test import MComixTest
 from test.test_mobi import _book, _image
 from mcomix.archive import mobi

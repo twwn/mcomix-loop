@@ -1,8 +1,8 @@
 """Where does the library chooser test segfault?  VARIANT picks:
 none - no chooser; main - chooser over the main window; lib - over a
 Gtk.Window subclass; plain - over a plain Gtk.Window."""
-import os, sys, unittest
-sys.path.insert(0, '/tmp/mcomix-git')
+import gc, os, sys, unittest
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 from gi.repository import Gtk
 from test import MComixTest, pump
 from mcomix import constants, icons, main
@@ -24,9 +24,6 @@ class Probe(MComixTest):
         pump()
         from mcomix import file_chooser_library_dialog as m
         if os.environ.get('NOREMOVE'):
-            from mcomix import file_chooser_base_dialog as b
-            orig = m._LibraryFileChooserDialog.__init__
-            real_remove = Gtk.FileChooserWidget.remove_filter
             Gtk.FileChooserWidget.remove_filter = lambda self, f: print('remove skipped', flush=True)
         if parent is not None:
             m.open_library_filechooser_dialog(parent)
@@ -38,7 +35,6 @@ class Probe(MComixTest):
             if parent is not window:
                 parent.destroy()
                 pump()
-        import gc
         print('collecting', flush=True)
         gc.collect()
         print('collected', flush=True)
@@ -48,5 +44,7 @@ class Probe(MComixTest):
         main.set_main_window(None)
         pump()
 
-unittest.main(argv=[sys.argv[0], 'Probe'], exit=False)
-sys.stdout.flush(); os._exit(0)
+if __name__ == '__main__':
+    unittest.main(argv=[sys.argv[0], 'Probe'], exit=False)
+    sys.stdout.flush()
+    os._exit(0)

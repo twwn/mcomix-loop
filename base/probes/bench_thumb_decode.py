@@ -1,15 +1,16 @@
 # Scaled thumbnail decode: gdk-pixbuf new_from_file_at_size against Pillow
 # draft(), and load_pixbuf_size as it stands, on a small and a large JPEG
 # and a large PNG. Imports mcomix but calls nothing that writes; run with
-# HOME and XDG_* pointed into SCRATCH anyway.
-import os, sys, time
-sys.path.insert(0, '/tmp/mcomix-git')
+# HOME and XDG_* pointed into SCRATCH anyway. Run from the checkout, or set
+# TREE; the images go to STATE/scratch/thumbbench.
+import os, sys, time, zipfile
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())
 from PIL import Image
 import numpy as np
-S = os.path.expanduser('~/.claude/skills/mcomix-loop/state/scratch/thumbbench')
+HERE = os.path.dirname(os.path.abspath(__file__))
+S = os.path.join(os.path.dirname(HERE), 'scratch', 'thumbbench')
 os.makedirs(S, exist_ok=True)
-import zipfile
-zipfile.ZipFile(os.path.expanduser('~/.claude/skills/mcomix-loop/state/probes/big60.cbz')).extract('page000.jpg', S)
+zipfile.ZipFile(os.path.join(HERE, 'big60.cbz')).extract('page000.jpg', S)
 rng = np.random.default_rng(1)
 base = (rng.random((3056, 1988, 3)) * 60 + np.linspace(0, 190, 1988)[None, :, None]).astype('uint8')
 Image.fromarray(base).save(os.path.join(S, 'big.jpg'), quality=92)

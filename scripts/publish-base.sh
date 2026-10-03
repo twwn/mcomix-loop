@@ -10,7 +10,7 @@
 # Then it regenerates the index files, adds a log.md entry, checks conformance
 # and lists lines that look machine- or person-specific, for review.
 set -u
-. "$(dirname "$0")/paths.sh"
+case "$0" in */*) . "${0%/*}/paths.sh" ;; *) . ./paths.sh ;; esac
 BASE=$SKILL_DIR/base
 [ -d "$STATE" ] || { echo "no $STATE" >&2; exit 2; }
 rm -rf "$BASE/techniques" "$BASE/decisions" "$BASE/probes"

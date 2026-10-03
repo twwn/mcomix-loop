@@ -1,5 +1,11 @@
-import os, shutil, sys
-sys.path.insert(0, '/tmp/mcomix-git')
+"""What LibraryBackend.add_book() does with truncated and damaged archives.
+
+Run from the checkout on MComixTest: each book is cut at 10, 50 and 90 % (a
+zip also gets 200 zero bytes in its middle) and added; prints the answer
+or the exception per book.
+"""
+import os, sys
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 from test import MComixTest, get_testfile_path
 from test.test_mobi import _book, _image
 from mcomix import constants
@@ -13,7 +19,8 @@ class Probe(MComixTest):
         self.addCleanup(lib.close)
         cases = {'b.mobi': _book([_image('JPEG')])[:150]}
         for src in ('02-TAR-Normal.tar', '03-RAR-Normal.rar', '04-7Z-Normal.7z', '01-ZIP-Normal.zip'):
-            data = open(get_testfile_path('archives', src), 'rb').read()
+            with open(get_testfile_path('archives', src), 'rb') as f:
+                data = f.read()
             for frac in (0.1, 0.5, 0.9):
                 cases['%s-%s' % (frac, src)] = data[:int(len(data) * frac)]
             if src.endswith('.zip'):

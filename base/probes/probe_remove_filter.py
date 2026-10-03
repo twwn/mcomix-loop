@@ -1,7 +1,7 @@
 """Bare GTK: does removing the current filter of a Gtk.FileChooserWidget
 leave the Python wrapper pointing at freed memory?  ORDER=first sets
 another filter current before removing."""
-import gc, os, sys
+import gc, os
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib

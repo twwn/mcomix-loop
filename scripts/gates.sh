@@ -3,9 +3,9 @@
 #
 #   gates.sh [pytest|static|all|deprecations] [--tree <dir>] [--export[=<rev>]]
 #
-#   all (default)   pytest under xvfb-run -n 8, flake8 --select=F, mypy
+#   all (default)   pytest under xvfb-run -n 8, then flake8 --select=F beside mypy
 #   pytest          the suite only
-#   static          flake8 and mypy only
+#   static          flake8 and mypy only, side by side
 #   deprecations    DeprecationWarning names the last pytest log reached (no run)
 #   --tree <dir>    run in <dir> instead of the checkout (a campaign worktree)
 #   --export[=rev]  run on a clean `git archive` of <rev> (default HEAD) of the
@@ -14,13 +14,18 @@
 # Exit 0 when every gate that ran passed, 1 otherwise, 2 on a usage error.
 # Full logs: <skill>/state/scratch/{pytest,flake8,mypy}.txt
 #
+# A tree under the scratch or export directory shares one mypy cache,
+# <skill>/state/scratch/mypy-cache. An export is new every time, and mypy
+# took 24 s on one without a cache, under a second with one. The cache checks
+# every module against its source, so trees can share it.
+#
 # The timeouts are `timeout -k 5` inside the command on purpose: the Bash
 # tool's own timeout moves an overrunning command to the background instead
 # of killing it, so only this surfaces a hang (exit 124).
 
 set -u
 
-. "$(dirname "$0")/paths.sh"
+case "$0" in */*) . "${0%/*}/paths.sh" ;; *) . ./paths.sh ;; esac
 REPO=$(resolve_repo) || { echo "gates: $PWD is not an MComix checkout (mcomix/, test/, mcomix/constants.py); start claude in one" >&2; exit 2; }
 
 mode=all
@@ -48,7 +53,7 @@ if [ "$mode" = deprecations ]; then
         exit 2
     fi
     echo "deprecations reached by the last suite run ($(stat -c %y "$SCRATCH/pytest.txt" | cut -d. -f1)):"
-    grep -oP 'DeprecationWarning: \S+' "$SCRATCH/pytest.txt" | sort -u
+    grep -oE 'DeprecationWarning: [^[:space:]]+' "$SCRATCH/pytest.txt" | sort -u
     exit 0
 fi
 
@@ -63,10 +68,13 @@ fi
 
 case "$tree" in /*) ;; *) tree=$REPO/$tree ;; esac         # --tree may be relative to the checkout
 cd "$tree" || { echo "gates: cannot cd to $tree" >&2; exit 2; }
+mypy_cache=()
+case "$tree" in "$SCRATCH"/*|"$EXPORT_DIR"/*) mypy_cache=(--cache-dir "$SCRATCH/mypy-cache") ;; esac
 
-# Stamp for the Stop hook: the gates ran now; LOOP_NOTES must be newer by the
-# end of the iteration. Reset the hook's block counter for this run.
-: > "$SCRATCH/gates.stamp"
+# Stamp for the Stop hook: the gates ran now, in this session, for this
+# checkout; LOOP_NOTES must be newer by the end of the iteration. Reset the
+# hook's block counter for this run.
+printf '%s\t%s\n' "${CLAUDE_CODE_SESSION_ID:-}" "$REPO" > "$SCRATCH/gates.stamp"
 rm -f "$SCRATCH/stop-blocks"
 
 status=0
@@ -90,8 +98,14 @@ if [ "$mode" = all ] || [ "$mode" = pytest ]; then
 fi
 
 if [ "$mode" = all ] || [ "$mode" = static ]; then
+    # Independent of each other, so flake8 runs beside mypy. The suite runs
+    # alone: beside them it would run slower, and nearer its timeout.
     timeout -k 5 "$T_FLAKE8" python3 -m flake8 --select=F mcomix/ test/ \
-        > "$SCRATCH/flake8.txt" 2>&1
+        > "$SCRATCH/flake8.txt" 2>&1 &
+    flake8_pid=$!
+    timeout -k 5 "$T_MYPY" python3 -m mypy ${mypy_cache[@]+"${mypy_cache[@]}"} mcomix > "$SCRATCH/mypy.txt" 2>&1
+    mypy_rc=$?
+    wait "$flake8_pid"
     rc=$?
     if [ "$rc" -eq 124 ]; then
         echo "flake8: HUNG, killed after ${T_FLAKE8}s"; status=1
@@ -102,8 +116,7 @@ if [ "$mode" = all ] || [ "$mode" = static ]; then
         echo "flake8: silent"
     fi
 
-    timeout -k 5 "$T_MYPY" python3 -m mypy mcomix > "$SCRATCH/mypy.txt" 2>&1
-    rc=$?
+    rc=$mypy_rc
     if [ "$rc" -eq 124 ]; then
         echo "mypy: HUNG, killed after ${T_MYPY}s"; status=1
     elif [ "$rc" -ne 0 ]; then
@@ -114,5 +127,14 @@ if [ "$mode" = all ] || [ "$mode" = static ]; then
     fi
 fi
 
-echo "tree: $tree at $(git -C "$tree" rev-parse --short HEAD 2>/dev/null || echo 'no git'); logs: $SCRATCH"
+# An export lies inside the skill's own repository when the skill is a git
+# clone: name the revision exported, never the HEAD git finds above it.
+if [ -n "$export_rev" ]; then
+    at="$export_rev ($sha), exported"
+elif prefix=$(git rev-parse --show-prefix 2>/dev/null) && [ -z "$prefix" ]; then
+    at=$(git rev-parse --short HEAD)
+else
+    at="no checkout of its own"
+fi
+echo "tree: $tree at $at; logs: $SCRATCH"
 exit $status

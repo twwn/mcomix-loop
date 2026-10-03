@@ -1,6 +1,6 @@
 # Copy into <worktree>/test/test_zz_measure.py and run with
 # timeout -k 5 120 env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a python3 -m pytest test/test_zz_measure.py -q -p no:cacheprovider -s -k "M and (edit or library)" | grep -E "MEASURE|FINAL|SURV"
-# Prefix MCOMIXPATH=/tmp/mcomix-git to measure master's code. Delete it afterwards.
+# Prefix MCOMIXPATH=<checkout> to label a run of the main checkout's code. Delete it afterwards.
 import collections, gc, os
 from .test_dialog_freed import MainWindowDialogsFreedTest as T
 from . import pump

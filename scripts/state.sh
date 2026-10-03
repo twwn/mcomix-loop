@@ -6,7 +6,7 @@
 # to be read once, not grepped.
 
 set -u
-. "$(dirname "$0")/paths.sh"
+case "$0" in */*) . "${0%/*}/paths.sh" ;; *) . ./paths.sh ;; esac
 REPO=$(resolve_repo) || { echo "state: $PWD is not an MComix checkout (mcomix/, test/, mcomix/constants.py). Start claude in one; the loop does nothing elsewhere." >&2; exit 2; }
 is_gtk4 "$REPO" || { echo "state: $REPO does not require Gtk 4.0 anywhere under mcomix/; this loop targets the GTK4 port and its rules are wrong for a GTK3 tree." >&2; exit 2; }
 CAMPAIGN=$REPO/.claude/worktrees/campaign
@@ -47,14 +47,7 @@ if [ -e "$NOTES" ]; then awk 'NR == 1 && /^---$/ { fm = 1; next } fm && /^---$/ 
 else echo "MISSING (fresh chain: baseline the gates on a clean tree, write the file from scratch at the end)"; fi
 
 echo "== LOOP_TECHNIQUES: $TECHNIQUES/<name>.md =="
-$OKF index >/dev/null 2>&1
-$OKF list 2>/dev/null || echo "MISSING"
-missing=$(cat "$TECHNIQUES"/*.md 2>/dev/null | grep -oE 'STATE/probes/[A-Za-z0-9_./-]+' | sed 's/[.]*$//' | sort -u | while read -r ref; do
-    [ -e "$STATE/${ref#STATE/}" ] || printf '%s ' "$ref"
-done)
-[ -n "$missing" ] && echo "probes named but not on disk (rebuild from the description before use): $missing"
-problems=$($OKF check 2>/dev/null)
-[ -n "$problems" ] && printf '== bundle problems (fix before ending the iteration) ==\n%s\n' "$problems"
+$OKF state || echo "(okf.py state failed; the bundle may be unreadable)"
 
 echo "== protocol =="
 echo "Before a lead: grep -rn its file and function in $REJECTED. A ruling from the user: record it with okf.py ruling, in their words, then act."

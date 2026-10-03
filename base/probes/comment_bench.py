@@ -1,6 +1,6 @@
 """How i18n.to_unicode() reads eleven comment texts, per chardet."""
-import sys, locale
-sys.path.insert(0, '/tmp/mcomix-git')
+import os, sys
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 import chardet
 from mcomix import i18n
 TEXTS = {

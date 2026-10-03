@@ -1,4 +1,12 @@
-import random, sys, collections
+"""Random check of ZoomModel.get_zoomed_size() against what each fit mode promises.
+
+Usage: python3 zoom_props.py [<mcomix tree>]
+Over 20,000 random pages, screens, fit modes and scale-up settings: never
+wider or taller than the screen where the mode fits that axis, never
+enlarged without scale up, the aspect ratio kept, and with scale up the
+fitted axis filled. Prints two examples per kind of failure, then counts.
+"""
+import collections, random, sys
 sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else '.')
 from mcomix import zoom, constants
 M = constants.ZoomMode

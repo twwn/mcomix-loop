@@ -1,6 +1,6 @@
 """How name_encoding() reads fifteen sets of page names, per chardet."""
-import sys
-sys.path.insert(0, '/tmp/mcomix-git')
+import os, sys
+sys.path.insert(0, os.environ.get('TREE') or os.getcwd())   # the checkout this runs from, or TREE
 import chardet
 from mcomix.archive import archive_base
 SETS = [

@@ -19,7 +19,13 @@ from . import MComixTest, pump, wait_for
 
 from mcomix import constants, icons, main
 
-BOOK = os.path.expanduser('~/.claude/skills/mcomix-loop/state/probes/big60.cbz')
+# Copied into the tree, this file cannot find the skill from where it is:
+# BOOK, or big60.cbz where a personal or a project install keeps it.
+BOOK = os.environ.get('BOOK') or next(
+    (path for path in (
+        os.path.expanduser('~/.claude/skills/mcomix-loop/state/probes/big60.cbz'),
+        os.path.join(os.getcwd(), '.claude/skills/mcomix-loop/state/probes/big60.cbz'))
+     if os.path.exists(path)), 'big60.cbz')
 
 
 class PageTurn(MComixTest):
