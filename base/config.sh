@@ -19,3 +19,13 @@ T_MYPY=120
 # command, Edit or Write that names one. Empty means none.
 FOREIGN=()
 # FOREIGN=(/home/me/src/mcomix-pr-prep)
+
+# The only GitHub writes the guard lets through. ISSUES_REPO (owner/name):
+# gh issue create, edit, comment, close and reopen, each with --repo naming
+# it. ISSUES_PROJECT (owner/number, from the project's URL): gh project
+# item-add and item-edit on it, as `<number> --owner <owner>`; the token
+# needs the project scope (gh auth refresh -s project). Empty: none.
+ISSUES_REPO=""
+ISSUES_PROJECT=""
+# ISSUES_REPO=me/mcomix
+# ISSUES_PROJECT=me/1

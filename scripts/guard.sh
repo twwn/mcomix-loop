@@ -330,14 +330,21 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
     return 0
 }
 
-check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; anything that reaches GitHub is the user's.
+check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; of what reaches GitHub, only the issues and project config.sh names.
     local sub=${1:-} act=${2:-}
     case "$sub" in
         ""|--version|version|help|status|search) return 0 ;;
         auth)     [ "$act" = status ] && return 0 ;;
         run)      case "$act" in list|view|download) return 0 ;; esac ;;   # not watch: it blocks past the tool's timeout
         pr)       case "$act" in list|view|diff|checks|status) return 0 ;; esac ;;
-        issue)    case "$act" in list|view|status) return 0 ;; esac ;;
+        issue)    case "$act" in
+                      list|view|status) return 0 ;;
+                      create|edit|comment|close|reopen) shift 2; check_gh_issue "$act" "$@"; return 0 ;;
+                  esac ;;
+        project)  case "$act" in
+                      list|view|item-list|field-list) return 0 ;;
+                      item-add|item-edit) shift 2; check_gh_project "$act" "$@"; return 0 ;;
+                  esac ;;
         release)  case "$act" in list|view|download) return 0 ;; esac ;;
         repo)     [ "$act" = view ] && return 0 ;;
         workflow) case "$act" in list|view) return 0 ;; esac ;;
@@ -354,7 +361,51 @@ check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; anything that
             fi
             has " $* " ' (-X|--method)[ =]?(POST|PUT|PATCH|DELETE)| (-f|-F|--field|--raw-field|--input)[ =]' || return 0 ;;
     esac
-    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release: list and view; api GET; api graphql with a query); what reaches GitHub is the user's."
+    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release, project: list and view; api GET; api graphql with a query) and writes only what state/config.sh allows (issues of ISSUES_REPO, items of ISSUES_PROJECT); the rest of what reaches GitHub is the user's."
+}
+
+check_gh_issue() {   # $1: create|edit|comment|close|reopen, then its arguments
+    local act=$1 t v named=""
+    shift
+    [ -n "$ISSUES_REPO" ] \
+        || deny "gh issue $act: $STATE/config.sh names no ISSUES_REPO, so issues are the user's. Prepare the commands for the user under 'Questions for the user'."
+    while [ $# -gt 0 ]; do
+        t=$1; shift
+        case "$t" in
+            -R|--repo) v=${1:-}; shift ;;
+            --repo=*) v=${t#--repo=} ;;
+            -R?*) v=${t#-R} ;;
+            -p|--project|--project=*|--add-project|--add-project=*|--remove-project|--remove-project=*)
+                deny "gh issue $act $t: a project is named by its title here, which the guard cannot match to ISSUES_PROJECT; add the issue with 'gh project item-add <number> --owner <owner> --url <issue>'." ;;
+            *) continue ;;
+        esac
+        [ "$v" = "$ISSUES_REPO" ] || deny "gh issue $act --repo $v: the loop writes only the issues of $ISSUES_REPO (ISSUES_REPO)."
+        named=1
+    done
+    [ -n "$named" ] || deny "gh issue $act: name the repository, --repo $ISSUES_REPO; without it gh picks one from the checkout's remotes."
+}
+
+check_gh_project() {   # $1: item-add|item-edit, then its arguments
+    local act=$1 t v named="" owner=${ISSUES_PROJECT%/*} number=${ISSUES_PROJECT##*/}
+    shift
+    [ -n "$ISSUES_PROJECT" ] \
+        || deny "gh project $act: $STATE/config.sh names no ISSUES_PROJECT, so projects are the user's. Prepare the commands for the user under 'Questions for the user'."
+    [ "${1:-}" = "$number" ] \
+        || deny "gh project $act: the project's number comes first, as 'gh project $act $number --owner $owner'; the loop writes only project $ISSUES_PROJECT (ISSUES_PROJECT)."
+    shift
+    while [ $# -gt 0 ]; do
+        t=$1; shift
+        case "$t" in
+            --owner) v=${1:-}; shift ;;
+            --owner=*) v=${t#--owner=} ;;
+            --project-id|--project-id=*)
+                deny "gh project $act --project-id: a node ID the guard cannot match to ISSUES_PROJECT; use 'gh project $act $number --owner $owner'." ;;
+            *) continue ;;
+        esac
+        [ "$v" = "$owner" ] || deny "gh project $act --owner $v: the loop writes only project $ISSUES_PROJECT (ISSUES_PROJECT)."
+        named=1
+    done
+    [ -n "$named" ] || deny "gh project $act: name the owner, as 'gh project $act $number --owner $owner'."
 }
 
 # Split on command separators and substitutions; inspect every segment.
