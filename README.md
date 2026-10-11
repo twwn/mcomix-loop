@@ -18,7 +18,7 @@ Read this before you install it. The loop runs unattended.
 - **Writes** – to two places only: the checkout, and `state/` in the skill's directory.
 - **Remembers** – in `state/`, an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) bundle. It holds techniques, your rulings, what it examined and left alone, its notes, probes and gate logs. It records your rulings and never edits them.
 - **Keeps out of your MComix data** – `~/.config/mcomix` and `~/.local/share/mcomix`. The hook refuses both. With the settings snippet merged, Claude Code denies them too.
-- **Uses `auto` permission mode** – a permission prompt would stall a loop nobody watches. Claude Code's classifier still reviews every command.
+- **Uses `auto` permission mode** – a permission prompt would stall a loop nobody watches. Claude Code's classifier still reviews every command but the one the settings snippet allows: closing an issue of your repository.
 - **May open a git worktree** – at `<checkout>/.claude/worktrees/campaign`, for a change too large for one commit. Only for a campaign you approved.
 
 If that is more than you want an unattended process to do, do not install it.
@@ -71,6 +71,7 @@ Then:
 
    - `defaultMode: auto` – the loop's permission mode.
    - `additionalDirectories` – needed only for the personal install. Write the absolute path if `~` is not expanded.
+   - `allow` – `gh issue close` on the repository `ISSUES_REPO` names, so that closing an issue does not wait on the classifier. Replace `twwn/mcomix` with yours, or drop the rule if `ISSUES_REPO` stays unset. The guard still checks the command first.
    - `deny` – MComix's real data.
    - `BASH_DEFAULT_TIMEOUT_MS` – the full gates take longer than the Bash tool's two-minute default.
    - `attribution.commit` – the commit trailer. Empty, so the loop's commits carry none. Yours to change.

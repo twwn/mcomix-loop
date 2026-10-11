@@ -4,6 +4,9 @@
     "additionalDirectories": [
       "~/.claude/skills/mcomix-loop/state"
     ],
+    "allow": [
+      "Bash(gh issue close * --repo twwn/mcomix *)"
+    ],
     "deny": [
       "Edit(~/.config/mcomix/**)",
       "Edit(~/.local/share/mcomix/**)",

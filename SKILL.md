@@ -249,6 +249,17 @@ preferences file, leaked files into the recent list, and left bookmarks in the
 user's real bookmark store. The guard only sees paths named in a command; a
 probe that opens the real paths from Python is invisible to it.
 
+**Nor may anything reach the user's desktop.** A probe or test never calls a
+launcher for real — `Gtk.FileLauncher`, `Gtk.UriLauncher`,
+`Gio.AppInfo.launch`: a private bus and Xvfb do not contain one. The portal
+one reached inherited the real `DISPLAY` and opened the installed MComix on
+the user's screen, with the user's settings. Patch the launcher class in the
+module under test and read what it was called with. The session bus leaks
+the same way: MComix can take a name on it (`mcomix/single_instance.py`), so
+a probe or test that starts an MComix gives it a `dbus-daemon` of its own,
+named in that process's `DBUS_SESSION_BUS_ADDRESS`. The guard sees neither;
+the technique "Probes" has both recipes.
+
 **Clean up what a test or probe starts.** A window left on screen is
 answered by the next test that looks for one. `MComixTest` fails the test that
 leaves one ("left on screen: <class>"), so a probe not built on it has to
@@ -331,12 +342,16 @@ reached. What it runs, for probes that need a variant:
 
 ```sh
 env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 60 \
-    xvfb-run -a python3 -m pytest test/ -q -n 8
+    xvfb-run -a -s "-screen 0 1280x1024x24" python3 -m pytest test/ -q -n 8
 timeout -k 5 60  python3 -m flake8 --select=F mcomix/ test/   # must be silent
 timeout -k 5 120 python3 -m mypy mcomix                        # must report no issues
 ```
 
-Run outside `xvfb-run`, the suite hangs rather than failing. `-n 8` is
+Run outside `xvfb-run`, the suite hangs rather than failing. The screen is
+the CI's: `xvfb-run`'s own default is smaller (640x480 here), a window is as
+large as the screen lets it be, and tests have passed at one size and failed
+at the other. A probe that measures or shows a window takes the same `-s`.
+`-n 8` is
 `WORKERS` from `STATE/config.sh`, measured for the machine; `-n auto` is
 slower because worker start-up dominates a suite this short.
 
@@ -354,6 +369,16 @@ pytest must not lose passes, flake8 must stay silent, and mypy must stay at
 zero. The configuration is `--strict` plus `disallow_any_explicit`, so new
 code is fully annotated with real types, and an explicit `Any` needs an
 `ignore[explicit-any]` whose comment says why.
+
+**A commit that adds tests of paths or files also passes under Wine before
+it is called done**: `STATE/probes/wine_pytest.sh` on an export of the tree
+with those tests, as the technique "The test suite under Wine" runs it (its
+set-up lives in `SCRATCH`; the technique rebuilds it). A Windows failure
+otherwise shows only in the CI, after the user has pushed. A Wine pass is
+not a Windows pass for a test that reads `/proc`, `/dev` or `/sys`: Wine
+shows a Windows Python the host's. Grep the new tests for such paths and
+guard them by platform; "Windows: what the tests must not assume" lists what
+else differs.
 
 **Timeouts:** `T_PYTEST` (60 s) for the suite and any probe, `T_MYPY` (120
 s) for mypy, from `STATE/config.sh`, as `timeout -k 5 <seconds>` inside the
@@ -395,7 +420,10 @@ With `ISSUES_REPO` and `ISSUES_PROJECT` set, the open issues are the feature
 list and the public record of planned work; `STATE/scratch/sf/features.md`
 is retired once they hold everything in it. `state.sh` reads them, and the
 discussions, every iteration. What the loop posts is public, under the
-user's account.
+user's account. Each `gh` write is a Bash call of its own, never chained
+with another command: the session's permission classifier has refused a
+chain that held a `gh issue close` ("External System Writes") and passed
+every write made alone.
 
 - **A lead that has an issue** moves to In Progress when an iteration starts
   on it: `gh project item-edit <number> --owner <owner> --url <issue url>
@@ -419,7 +447,8 @@ user's account.
   Campaign): `item-edit ... --field Size --value <size>`. If the field is
   missing: `gh project field-create <number> --owner <owner> --name Size
   --data-type SINGLE_SELECT --single-select-options
-  Small,Medium,Large,Campaign`.
+  Small,Medium,Large,Campaign`. A size given from a title is a guess: set
+  it again once the issue has been read against the tree.
 - **A campaign's issue holds its steps as sub-issues**, filed as its plan
   names them (`gh issue create --repo <ISSUES_REPO> --parent <n>`, `gh issue
   edit <n> --repo <ISSUES_REPO> --add-sub-issue <m>`). The steps' commits
@@ -449,6 +478,13 @@ being wrong: `get_action_area()` read on a dialog that keeps its buttons
 elsewhere; `AccelLabel.get_accel()`, which reports only manually set
 accelerators and so said "none" for a menu with 72. When a probe says
 something surprising, prove the probe first.
+
+**A probe measures the checkout only if it imports it.** Python puts the
+script's own folder first on `sys.path`, not the working directory, so
+`python3 <path outside REPO>/probe.py`, even run from `REPO`, imports the
+MComix the user installed. A probe under `STATE` runs with
+`PYTHONPATH=<REPO>`, or as a test module copied under `test/`; only
+`python3 -m` and `-c` start from the working directory.
 
 **A bug fix has a regression test you watched fail.** Write the test, copy
 the fixed file aside, `git checkout HEAD -- <file>`, confirm the test fails,
@@ -495,7 +531,13 @@ the checkout is on (`state.sh` names it; `BRANCH` below) as a single squashed
 commit when all of it is done.
 
 **Opening one is the user's decision**: propose it under `Questions for the
-user` with a size estimate. **It is carried in a worktree of its own**,
+user` with a size estimate. **The estimate is read off the tree, not off the
+request's title**, and read again before the worktree is opened: of four
+upstream requests sized Campaign by their titles, one was built already and
+two partly. What is there is closed with a test that holds it, what is left
+is sized anew, and only work still too large for one commit gets a worktree
+(the technique "Upstream SourceForge tickets: reading them"). **It is
+carried in a worktree of its own**,
 because loose files in `REPO` have been swallowed by the user's amends; it
 lives under `.claude/worktrees/`, which `.git/info/exclude` hides:
 
