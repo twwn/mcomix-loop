@@ -200,7 +200,10 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
     local tok
     case "$sub" in
         stash)
-            deny "git stash: the stash stack belongs to the repository and other sessions share it. Copy the file aside instead." ;;
+            case "${1:-}" in
+                list|show) ;;   # reading the stack changes nothing
+                *) deny "git stash: the stash stack belongs to the repository and other sessions share it. Copy the file aside instead." ;;
+            esac ;;
         push)
             deny "git push: what leaves this machine is the user's decision." ;;
         commit)

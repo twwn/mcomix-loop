@@ -80,8 +80,10 @@ rm -f "$SCRATCH/stop-blocks"
 status=0
 
 if [ "$mode" = all ] || [ "$mode" = pytest ]; then
+    # The CI's screen: xvfb-run's own default is 640x480 here, and a window
+    # is as large as the screen lets it be.
     env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 "$T_PYTEST" \
-        xvfb-run -a python3 -m pytest test/ -q -n "$WORKERS" \
+        xvfb-run -a -s "-screen 0 1280x1024x24" python3 -m pytest test/ -q -n "$WORKERS" \
         > "$SCRATCH/pytest.txt" 2>&1
     rc=$?
     # Grep, never tail: the summary line is interleaved with warning output.
