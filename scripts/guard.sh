@@ -144,17 +144,22 @@ esac
 re_inplace='(^|[ ;&|(])(sed|perl)[[:space:]]+-[A-Za-z]*i|(^|[ ;&|(])truncate[[:space:]]'
 re_tee='(^|[ ;&|(])tee[[:space:]]'
 re_tee_append='tee[[:space:]]+(-[^ ]+[[:space:]]+)*(-a|--append)'
-check_appendonly() {   # $1: one segment, $2: an append-only file it names
+# A concept or REJECTED is corrected in place with the Edit tool, which the
+# file-tool rules above allow; from the shell it may only be appended to.
+# Each refusal says so, since "append-only" alone once read as "never
+# corrected in place" and left wrong statements standing.
+check_appendonly() {   # $1: one segment, $2: a file the shell may only append to
     local seg=$1 f=$2 name=${2##*/}
-    has "$seg" "(^|[^>])>[[:space:]]*$f" && deny "$name is append-only; use '>>'."
-    has "$seg" "$re_inplace" && deny "$name is append-only; no in-place edits or truncation."
+    local edit="correct it in place with the Edit tool"
+    has "$seg" "(^|[^>])>[[:space:]]*$f" && deny "$name is only appended to from the shell, with '>>'; $edit."
+    has "$seg" "$re_inplace" && deny "$name is not edited from the shell (sed -i, perl -i, truncate); $edit, or append with '>>'."
     if has "$seg" "$re_tee" && ! has "$seg" "$re_tee_append"; then
-        deny "$name is append-only; 'tee' needs -a."
+        deny "$name is only appended to from the shell, with 'tee -a'; $edit."
     fi
     # shellcheck disable=SC2206
     local t=($seg)
     case "${t[0]}" in
-        cp|mv|install|*/cp|*/mv) [ "${t[${#t[@]}-1]}" = "$f" ] && deny "$name is append-only; it is never replaced." ;;
+        cp|mv|install|*/cp|*/mv) [ "${t[${#t[@]}-1]}" = "$f" ] && deny "$name is never replaced; append with '>>', or $edit." ;;
     esac
     return 0
 }

@@ -53,7 +53,12 @@ if [ "$mode" = deprecations ]; then
         exit 2
     fi
     echo "deprecations reached by the last suite run ($(stat -c %y "$SCRATCH/pytest.txt" | cut -d. -f1)):"
-    grep -oE 'DeprecationWarning: [^[:space:]]+' "$SCRATCH/pytest.txt" | sort -u
+    # A name is what follows DeprecationWarning or a subclass (PyGObject's
+    # PyGIDeprecationWarning names its own API). PytestDeprecationWarning
+    # is about pytest's configuration and names nothing: its "The" once
+    # passed for a sixteenth name.
+    grep -oE '[[:alnum:]_]*DeprecationWarning: [^[:space:]]+' "$SCRATCH/pytest.txt" \
+        | grep -v '^PytestDeprecationWarning:' | sort -u
     exit 0
 fi
 

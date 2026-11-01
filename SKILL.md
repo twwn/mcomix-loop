@@ -65,8 +65,9 @@ as it is.
 - `REJECTED` = `STATE/rejected.md` (`type: Rejection Register`) — what was
   examined and deliberately left alone, one line each beginning with where
   (`- backend.py:548 - ... Left (f792f346).`), added at the end, never
-  pruned; one proven wrong is corrected in place, "(reopened at <commit>:
-  ...)". Never read whole: `grep -n` it.
+  pruned; one proven wrong is corrected in place with Edit, "(reopened at
+  <commit>: ...)"; the shell may only append to it. Never read whole:
+  `grep -n` it.
 - `STATE/probes/` — probes that proved themselves, under the names the
   techniques give them. One named but missing (`state.sh` lists them) is
   rebuilt from its description when needed; not a prompt correction.
@@ -322,8 +323,12 @@ testing, gtk, code, windows, text), `sources` (`- { resource:
 "repo:<path>" }` for each file whose change would make it wrong, not every
 file it mentions) and `generated: { by: mcomix-loop/<your model id>, at:
 <now, UTC, ISO 8601> }`; a meaningful change moves `generated.at`. Correct
-a wrong statement in place, "(corrected at <commit>)"; never delete or
-overwrite a concept (the guard refuses). After re-checking one flagged
+a wrong statement in place with Edit, "(corrected at <commit>)", and move
+`generated.at` with Edit too. The shell may only append to a concept: the
+guard refuses `sed -i`, `perl -i`, `truncate` and `>` on one, and a
+correction appended below the statement it corrects leaves that statement
+standing for whoever reads only it. Never delete or overwrite a concept
+(the guard refuses). After re-checking one flagged
 `[sources changed]`, `okf.py verified <file>` records it. Link another as
 `[title](<name>.md)`. Read the relevant concept before writing a probe or a
 benchmark. It holds how to measure and test, not what was decided
