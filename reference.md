@@ -10,7 +10,10 @@ corrections`.
 ## The task list
 
 - **Bugs** of every kind: logic, uncaught cases, races, state that outlives
-  what owns it.
+  what owns it. Two classes a GTK port meets: a handler run again by what it
+  sets itself (`set_active()` from code emits `toggled`; `close()` emits
+  `close-request` before it returns), and a page number counted from one
+  used where an index counted from zero is meant, or the reverse.
 - **Speed**, measured, on the paths that run per page turn first.
 - **Idiom and structure**, with the standards in `SKILL.md` for refactors.
 - **Comments** that describe the code as it is now. Delete the ones that
