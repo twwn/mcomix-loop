@@ -24,7 +24,7 @@ The loop runs unattended.
 - **Commits** – to the checkout `claude` was started in, on whatever branch is checked out. Only after the test suite, flake8 and mypy pass.
 - **Never** – pushes, stashes, stages a file it did not name, or rewrites history.
 - **One exception** – the message of its own newest commit, while no remote branch contains it. It uses `git commit --amend --only`, so the tree stays as it is. Any other wrong message gets a `git notes` note.
-- **Enforced** – a hook, `scripts/guard.sh`, refuses the forbidden commands. It acts only in the loop's session. Your other Claude Code sessions in the same checkout are unaffected.
+- **Enforced** – a hook, `scripts/guard.sh`, refuses the forbidden commands. It acts only in the loop's session. Your other Claude Code sessions in the same checkout are unaffected. If the hook itself fails (missing, crashed, timed out), it refuses every command, and the loop stops.
 - **Runs** – the test suite under `xvfb-run`, and probes it writes itself. Each in the foreground, inside `timeout`.
 - **Writes** – to two places only: the checkout, and `state/` in the skill's directory.
 - **Posts to GitHub** – only what `config.sh` names. With `ISSUES_REPO`: issues and comments in that repository, and it closes the ones its commits finished. With `ISSUES_PROJECT`: that project's items and fields. What it posts is public, under your account. Unset, it writes nothing to GitHub.
@@ -38,7 +38,7 @@ If that is more than you want an unattended process to do, do not install it.
 ## Requirements
 
 - Linux.
-- Claude Code 2.1 or later, with `/loop` and `ScheduleWakeup`, on a plan that offers `auto` mode.
+- Claude Code 2.1.295 or later, with `/loop` and `ScheduleWakeup`, on a plan that offers `auto` mode. Older versions ignore the guard's `onFailure: block`, so a guard that fails lets the command through.
 - In the checkout's environment: `pytest` with `pytest-xdist`, `flake8`, `mypy`, `xvfb-run` (from Xvfb) and the gettext tools.
 - `jq`, optional. Without it, the hooks read their input with `python3`, which is slower to start.
 - A GTK 4 MComix checkout: `mcomix/`, `test/` and `mcomix/constants.py` under a git top level. The hooks, `state.sh` and `gates.sh` check for these.
