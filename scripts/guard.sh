@@ -3,9 +3,12 @@
 # that invoked /mcomix-loop; matcher "Bash|Monitor|Write|Edit").
 #
 # Exit 2 blocks the tool call and shows the stderr line to Claude. Exit 0
-# leaves the call to the normal permission flow. The rules are the "never"
-# rules of SKILL.md; the auto-mode classifier and the permission settings are
-# the other two layers. This is a guard against the model's own mistakes, not
+# leaves the call to the normal permission flow. Any other outcome (this
+# script missing, a crash, the hook's timeout) blocks the call too, by
+# `onFailure: block` in SKILL.md: a broken guard stops the loop instead of
+# letting its calls through unchecked; so it exits only by `deny` or 0.
+# The rules are the "never" rules of SKILL.md; the auto-mode classifier and
+# the permission settings are the other two layers. This is a guard against the model's own mistakes, not
 # a security boundary: it reads the command text, so `sh -c '...'` or a path
 # spelled through a variable can get past it.
 #

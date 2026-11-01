@@ -12,6 +12,7 @@ hooks:
         - type: command
           command: 'd=$HOME/.claude/skills/mcomix-loop; [ -d "$d/scripts" ] || d=$CLAUDE_PROJECT_DIR/.claude/skills/mcomix-loop; exec "$d/scripts/guard.sh"'
           timeout: 10
+          onFailure: block
   Stop:
     - hooks:
         - type: command
@@ -226,7 +227,11 @@ when it does. With `ISSUES_REPO` set:
 `gh project item-add|item-edit|field-create <number> --owner <owner>`. What
 to file and when is in "Issues and the project"; unset, the loop prepares
 the commands for the user.
-A refusal is not a puzzle to route around: do what the rule says.
+A refusal is not a puzzle to route around: do what the rule says. A refusal
+that names no rule (`hook error`, `blocking because onFailure is "block"`)
+is the guard itself failing, and every Bash, Write and Edit call is refused
+until the user repairs it: stop (`ScheduleWakeup` with `stop: true`, and a
+`PushNotification` quoting the error), since the notes cannot be written.
 Everything below is judgment the guard cannot make.
 
 **Other sessions share this repository.** The user commits by hand while
