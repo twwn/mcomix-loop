@@ -2,23 +2,35 @@
 
 **An unattended maintenance loop for the [MComix GTK 4 fork](https://github.com/twwn/mcomix), packaged as a [Claude Code](https://code.claude.com/docs) skill.**
 
-You start it once, with `/loop /mcomix-loop`. It wakes every minute. Each time, it picks the most valuable lead it can finish and verify: a bug, a measured slowdown, an incomplete feature, a refactor with a mechanical proof. It commits the work, writes itself notes and schedules the next wakeup. It stops on its own only for a decision that is yours.
+You start it once, with `/loop /mcomix-loop`.
+It wakes every minute; when all that is left waits on a CI run, after up to fifteen.
+Each time, it takes as many leads as it can finish and verify: a bug, a measured slowdown, an incomplete feature, a refactor with a mechanical proof.
+It commits each one, writes itself notes and schedules the next wakeup.
 
-It targets the fork's GTK 4 code base, the 4.x line. Upstream MComix 3 is GTK 3. The loop refuses to run there.
+It stops by itself for three reasons only:
+
+- **Quiet** – three iterations in a row committed nothing and advanced no campaign.
+- **Stuck** – a gate broke, and it can neither fix nor attribute the cause.
+- **Your call** – a decision that is yours is all that is left. Until then the question waits in its notes, and it works the other leads.
+
+It targets the fork's GTK 4 code base.
+Upstream MComix 3 is GTK 3; the loop refuses to run there.
 
 ## What it does to your machine
 
-Read this before you install it. The loop runs unattended.
+Read this before you install it.
+The loop runs unattended.
 
-- **Commits** – to the checkout `claude` was started in, on whatever branch is checked out. Only after the full test suite, flake8 and mypy pass.
+- **Commits** – to the checkout `claude` was started in, on whatever branch is checked out. Only after the test suite, flake8 and mypy pass.
 - **Never** – pushes, stashes, stages a file it did not name, or rewrites history.
 - **One exception** – the message of its own newest commit, while no remote branch contains it. It uses `git commit --amend --only`, so the tree stays as it is. Any other wrong message gets a `git notes` note.
 - **Enforced** – a hook, `scripts/guard.sh`, refuses the forbidden commands. It acts only in the loop's session. Your other Claude Code sessions in the same checkout are unaffected.
-- **Runs** – the test suite under `xvfb-run`, and probes it writes itself. Each one in the foreground, inside `timeout`.
+- **Runs** – the test suite under `xvfb-run`, and probes it writes itself. Each in the foreground, inside `timeout`.
 - **Writes** – to two places only: the checkout, and `state/` in the skill's directory.
-- **Remembers** – in `state/`, an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) bundle. It holds techniques, your rulings, what it examined and left alone, its notes, probes and gate logs. It records your rulings and never edits them.
+- **Posts to GitHub** – only what `config.sh` names. With `ISSUES_REPO`: issues and comments in that repository, and it closes the ones its commits finished. With `ISSUES_PROJECT`: that project's items and fields. What it posts is public, under your account. Unset, it writes nothing to GitHub.
+- **Remembers** – in `state/`, an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) bundle: techniques, your rulings, what it examined and left alone, its notes, probes and gate logs. It records your rulings and never edits them.
 - **Keeps out of your MComix data** – `~/.config/mcomix` and `~/.local/share/mcomix`. The hook refuses both. With the settings snippet merged, Claude Code denies them too.
-- **Uses `auto` permission mode** – a permission prompt would stall a loop nobody watches. Claude Code's classifier still reviews every command but the one the settings snippet allows: closing an issue of your repository.
+- **Uses `auto` permission mode** – a permission prompt would stall a loop nobody watches. Claude Code's classifier still reviews every command but one: closing an issue in your repository, which the settings snippet allows.
 - **May open a git worktree** – at `<checkout>/.claude/worktrees/campaign`, for a change too large for one commit. Only for a campaign you approved.
 
 If that is more than you want an unattended process to do, do not install it.
@@ -40,13 +52,15 @@ As a personal skill, available in every session, with its state outside any repo
 git clone https://github.com/twwn/mcomix-loop ~/.claude/skills/mcomix-loop
 ```
 
-Or as a project skill inside the checkout. Then `.claude/` must be in `.git/info/exclude` (step 3):
+Or as a project skill inside the checkout, with `.claude/` in `.git/info/exclude` (step 3):
 
 ```bash
 git clone https://github.com/twwn/mcomix-loop <checkout>/.claude/skills/mcomix-loop
 ```
 
-The hooks look in both places. `git pull` updates the skill. `state/` is gitignored, so an update leaves it alone.
+The hooks look in both places.
+`git pull` updates the skill.
+`state/` is gitignored, so an update leaves it alone.
 
 Then:
 
@@ -61,11 +75,13 @@ Then:
 
    Three parts describe one installation. Adapt them:
 
-   - `config.sh` – set `WORKERS` to what you measure. `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. Unset, it writes nothing to GitHub.
+   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`.
    - `project.md` – replace the author's facts with yours: where your fork stands, how you release, which campaigns are finished.
-   - `decisions/` – the author's rulings, one file each. Keep those tagged `program` if you build on this fork; they say why the program behaves as it does. Delete those tagged `installation`. Then confirm the ones you keep: `python3 scripts/okf.py confirm --as <you> state/decisions/*.md`.
+   - `decisions/` – the author's rulings, one file each. Keep those tagged `program` if you build on this fork: they say why the program behaves as it does. Delete those tagged `installation`. Confirm the ones you keep: `python3 scripts/okf.py confirm --as <you> state/decisions/*.md`.
 
-   The loop never edits `config.sh`, `project.md` or a ruling. It records new rulings itself. Its prompt marks them unconfirmed until you confirm them. Its first iteration measures the gates on your tree and rewrites the notes as its own.
+   The loop never edits `config.sh`, `project.md` or a ruling.
+   It records new rulings itself, marked unconfirmed until you confirm them.
+   Its first iteration measures the gates on your tree and rewrites the notes as its own.
 
 2. **Merge `settings-snippet.json`** into `~/.claude/settings.json`.
 
@@ -79,7 +95,12 @@ Then:
 
 3. **Hide `.claude/` in the checkout:** `echo '.claude/' >> .git/info/exclude`. The campaign worktree and Claude Code's subagent worktrees live there. The loop reads an untracked path in `git status` as someone's work in progress.
 
-4. **Turn off auto memory in the checkout:** `{"autoMemoryEnabled": false}` in its `.claude/settings.local.json`. Auto memory is a second, uncurated memory. Its index loads into every session. Left on, it collects rulings that belong in `decisions/`, and stale entries there contradict the curated files. The guard refuses the loop's writes there anyway; the setting spares the refused attempts. It applies to every session in that checkout, interactive ones too.
+4. **Turn off auto memory in the checkout:** `{"autoMemoryEnabled": false}` in its `.claude/settings.local.json`.
+
+   Auto memory is a second, uncurated memory, and its index loads into every session.
+   Left on, it collects rulings that belong in `decisions/`, and its stale entries contradict the curated files.
+   The guard refuses the loop's writes there anyway; the setting spares the refused attempts.
+   It applies to every session in that checkout, interactive ones too.
 
 ## Run
 
@@ -96,9 +117,9 @@ At the first wakeup:
 
 At the second wakeup, `/context` shows the skill once, not twice.
 
-- `Esc` while the loop waits cancels the pending wakeup.
-- Claude Code ends every loop after seven days. Restart it with the same command.
-- A loop that stopped by itself says why: in its last report, and in `state/notes.md` under `Questions for the user`.
+- **Cancel** – `Esc` while the loop waits cancels the pending wakeup.
+- **Seven days** – Claude Code ends every loop after seven days. Restart it with the same command.
+- **Why it stopped** – in its last report, and in `state/notes.md` under `Questions for the user`.
 
 ## How it works
 
@@ -114,46 +135,61 @@ At the second wakeup, `/context` shows the skill once, not twice.
 
 ### The memory
 
-`state/` is an [OKF 0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format) bundle. Every `.md` in it opens with YAML frontmatter naming its `type`. The `index.md` files are generated. `scripts/okf.py` lists, renders and checks the bundle.
+`state/` is an [OKF 0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format) bundle.
+Every `.md` in it opens with YAML frontmatter naming its `type`.
+The `index.md` files are generated.
+`scripts/okf.py` lists, renders and checks the bundle.
 
 | In `state/` | Type | Holds | Written | Read |
 |---|---|---|---|---|
 | `notes.md` | Iteration Notes | Gate numbers, open campaign, questions, the last claim, leads | Rewritten every iteration | In full, every iteration |
-| `techniques/*.md` | Technique | How to measure and test this code base. One topic each, with the source files it depends on | Added to, corrected in place, never deleted | Names every iteration, flagged when a source changed. Files on demand |
-| `rejected.md` | Rejection Register | What was examined and left alone, and why | Added to, corrected in place | By `grep`, before each lead |
+| `techniques/*.md` | Technique | How to measure and test this code base. One topic each, with the source files it depends on | Added to, corrected in place with Edit, never deleted | Names every iteration, flagged when a source changed. Files on demand |
+| `rejected.md` | Rejection Register | What was examined and left alone, and why | Added to, corrected in place with Edit | By `grep`, before each lead |
 | `decisions/*.md` | Ruling | Your rulings in your words, tagged `program` or `installation` | By `okf.py ruling`, never edited. Confirmed by you | One line each, in the prompt. Unconfirmed ones marked |
 | `project.md` | Installation | The facts of your installation | By you | In full, in the prompt |
 
-`reference.md` holds the task list and the facts of the code base. It goes into the prompt with the last two.
+`reference.md` holds the task list and the facts of the code base.
+It goes into the prompt with the last two.
 
 A technique names its sources as `repo:<path>`, a file in the MComix checkout.
 
 ### Commit messages
 
-The guard notes the parent and subject of each commit the loop makes, in `state/commits.log`, before the commit runs. That is how the loop tells its own commits from yours. A commit whose message the guard cannot read in advance is refused.
+The guard notes the parent and subject of each commit the loop makes, in `state/commits.log`, before the commit runs.
+That is how the loop tells its own commits from yours.
+A commit whose message the guard cannot read in advance is refused.
 
-A wrong message on a commit the loop cannot amend becomes a note. `git log` shows notes. GitHub does not. To carry notes across your own rebases: `git config notes.rewriteRef refs/notes/commits`. Or fold them into the messages.
+A wrong message on a commit the loop cannot amend becomes a note.
+`git log` shows notes; GitHub does not.
+To carry notes across your own rebases: `git config notes.rewriteRef refs/notes/commits`.
+Or fold them into the messages.
 
 ## Publishing your state
 
-The techniques and the probes improve with use. They are meant to be pushed back.
+The techniques and the probes improve with use.
+They are meant to be pushed back.
 
-Run `scripts/publish-base.sh` by hand, with no loop session open. It copies `state/` into `base/`:
+Run `scripts/publish-base.sh` by hand, with no loop session open.
+It copies `state/` into `base/`:
 
 - **Whole** – techniques, probes and `rejected.md`. Also the rulings and `project.md`, as the author's worked example.
 - **Trimmed** – `notes.md`. The sections about one installation are blanked. The gate numbers are marked as a seed.
 - **Never** – `config.sh`, `commits.log` and `scratch/`.
 
-It replaces your home path in what it copies. It regenerates the index files, adds a `log.md` entry and checks conformance. Last, it lists lines that look personal: a home path, a GPU name, another session's review process. Reword or drop them before you commit.
+It replaces your home path in what it copies.
+It regenerates the index files, adds a `log.md` entry and checks conformance.
+Last, it lists lines that look personal: a home path, a GPU name, another session's review process.
+Reword or drop them before you commit.
 
 ## Adapting it to another project
 
-It is not generic. The project-specific parts are in known places:
+It is not generic.
+The project-specific parts are in known places:
 
-- The fingerprint and the settings: `scripts/paths.sh`.
-- The gate commands: `scripts/gates.sh`.
-- The "Guardrails", "Verification gates" and "Evidence standards" sections of `SKILL.md`. They are about GTK, xdist and MComix's data paths.
-- `reference.md`.
+- **Fingerprint and settings** – `scripts/paths.sh`.
+- **Gate commands** – `scripts/gates.sh`.
+- **The GTK, xdist and data-path rules** – the "Guardrails", "Verification gates" and "Evidence standards" sections of `SKILL.md`.
+- **The code base's facts** – `reference.md`.
 
 The protocol carries over unchanged: state, gates, notes, campaigns, ending, hooks.
 
