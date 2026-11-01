@@ -41,6 +41,7 @@ If that is more than you want an unattended process to do, do not install it.
 - Claude Code 2.1.295 or later, with `/loop` and `ScheduleWakeup`, on a plan that offers `auto` mode. Older versions ignore the guard's `onFailure: block`, so a guard that fails lets the command through.
 - In the checkout's environment: `pytest` with `pytest-xdist`, `flake8`, `mypy`, `xvfb-run` (from Xvfb) and the gettext tools.
 - `jq`, optional. Without it, the hooks read their input with `python3`, which is slower to start.
+- Optional: the tools the techniques name, such as `vulture` and `zizmor`. Install them on the system. `auto` mode refuses to fetch a tool at run time (`uvx vulture`), so the loop asks for a missing one in its notes.
 - A GTK 4 MComix checkout: `mcomix/`, `test/` and `mcomix/constants.py` under a git top level. The hooks, `state.sh` and `gates.sh` check for these.
 - `gi.require_version('Gtk', '4.0')` somewhere under `mcomix/`. `state.sh` checks for it.
 

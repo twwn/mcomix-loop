@@ -284,6 +284,17 @@ and calls `os._exit(0)` when it is done.
 process, the whole matrix inside it; poll for a condition, never sleep. **No
 going back to GTK3**: no GTK3 idiom, no shim for both, no fallback.
 
+**Tools come from the machine.** Auto mode's classifier refuses a command
+that fetches a tool to run it (`uvx <tool>`, `uvx --from git+<url>`, `pipx
+run`, `npx`) as "Code from External". It refused zizmor,
+flatpak-builder-lint and vulture that way, and let the same kind of command
+through at other times, so a fetch that once worked is no plan. Check with
+`which`; a missing tool is a question under `Questions for the user`, naming
+the package, and the other leads go on meanwhile. Do not retry the fetch in
+another form; the denial's "stop and explain to the user" means that
+question, not a stop. A technique that names a fetch command is corrected
+to the installed tool once there is one.
+
 ## Handoff: `LOOP_NOTES`
 
 Rewrite it before you finish, under about 80 lines. It is a working note, not
