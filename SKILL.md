@@ -236,7 +236,8 @@ A hook in a skill's frontmatter does not fire inside a subagent. The hook
 `settings-snippet.json` adds to the user's settings does, and it runs the same
 guard for this session's subagents (`scripts/subagent-guard.sh`). Where
 `state.sh` says it is not merged, a subagent only reads, and the merge is a
-question for the user.
+question for the user. A subagent writes nothing in the bundle and posts nothing
+to GitHub: it reports to the main thread, and the guard refuses the rest.
 Everything below is judgment the guard cannot make.
 
 **Other sessions share this repository.** The user commits by hand while
