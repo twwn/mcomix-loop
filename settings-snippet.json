@@ -22,5 +22,20 @@
   },
   "worktree": {
     "baseRef": "head"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Monitor|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$HOME/.claude/skills/mcomix-loop; [ -d \"$d/scripts\" ] || d=$CLAUDE_PROJECT_DIR/.claude/skills/mcomix-loop; [ -x \"$d/scripts/subagent-guard.sh\" ] || exit 0; exec \"$d/scripts/subagent-guard.sh\"",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
   }
 }

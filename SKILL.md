@@ -232,6 +232,11 @@ that names no rule (`hook error`, `blocking because onFailure is "block"`)
 is the guard itself failing, and every Bash, Write and Edit call is refused
 until the user repairs it: stop (`ScheduleWakeup` with `stop: true`, and a
 `PushNotification` quoting the error), since the notes cannot be written.
+A hook in a skill's frontmatter does not fire inside a subagent. The hook
+`settings-snippet.json` adds to the user's settings does, and it runs the same
+guard for this session's subagents (`scripts/subagent-guard.sh`). Where
+`state.sh` says it is not merged, a subagent only reads, and the merge is a
+question for the user.
 Everything below is judgment the guard cannot make.
 
 **Other sessions share this repository.** The user commits by hand while
