@@ -13,6 +13,8 @@
 #   COMMITS    $STATE/commits.log      parent and subject of each commit the loop made (guard.sh)
 #   SCRATCH    $STATE/scratch          gate logs, exports, iteration.txt; not part of the bundle
 #   SESSIONS   $SCRATCH/sessions       one empty file per session the guard has run in (subagent-guard.sh)
+#   SWEEP      $SCRATCH/sweep          the open sweep's briefs, probes and reports (sweep.sh)
+#   SWEEPS     $STATE/sweeps.log       what each lens of each sweep returned and what survived (sweep.sh)
 #   CAMPAIGN  $REPO/.claude/worktrees/campaign — inside the project directory,
 #             next to where the harness puts subagent worktrees, so no extra
 #             permission scope is needed; .claude/ must be in .git/info/exclude.
@@ -35,6 +37,8 @@ REJECTED=$STATE/rejected.md
 COMMITS=$STATE/commits.log
 SCRATCH=$STATE/scratch
 SESSIONS=$SCRATCH/sessions
+SWEEP=$SCRATCH/sweep
+SWEEPS=$STATE/sweeps.log
 OKF="python3 -S $SKILL_DIR/scripts/okf.py"   # -S: stdlib only, and site's start-up is two thirds of its run
 
 # Per-installation settings, overridable in $STATE/config.sh (seeded from
@@ -47,8 +51,16 @@ FOREIGN=()         # checkouts other sessions own (absolute paths); refused by t
 EXPORT_DIR=$SCRATCH   # where `gates.sh --export` unpacks a tree; a short path on Python < 3.14
 ISSUES_REPO=""     # owner/name whose issues the loop may write with gh; empty: none
 ISSUES_PROJECT=""  # owner/number of the GitHub project whose items it may write; empty: none
+SWEEP_EVERY=25     # commits under mcomix/ or docs/ before a lens that found nothing runs again; 0: no sweeps
+SWEEP_WIDTH=5      # auditors at once
 # shellcheck disable=SC1091
 [ -r "$STATE/config.sh" ] && . "$STATE/config.sh"
+
+# subagents_guarded <checkout>: the settings name the hook that guards subagents.
+# It reads only the text: a session started before the merge may not have the hook yet.
+subagents_guarded() {
+    grep -qsF subagent-guard.sh "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" "$1/.claude/settings.json" "$1/.claude/settings.local.json"
+}
 
 # is_mcomix <dir>: the fingerprint of a checkout this loop may work on.
 is_mcomix() {

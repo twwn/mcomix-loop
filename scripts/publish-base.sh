@@ -6,7 +6,7 @@
 #   decisions/, project.md              copied whole: the author's installation,
 #                                       as the worked example (README says what to keep)
 #   notes.md                            gate numbers and leads kept, the rest blanked
-#   config.sh, commits.log, scratch/    never copied
+#   config.sh, commits.log, sweeps.log, scratch/   never copied
 # Then it regenerates the index files, adds a log.md entry, checks conformance
 # and lists lines that look machine- or person-specific, for review.
 set -u

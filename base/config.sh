@@ -20,6 +20,12 @@ T_MYPY=120
 FOREIGN=()
 # FOREIGN=(/home/me/src/mcomix-pr-prep)
 
+# Sweeps, when no lead can be worked (sweep.md). A lens that found nothing runs
+# again after SWEEP_EVERY commits under mcomix/ or docs/; 0 means no sweeps.
+# SWEEP_WIDTH is the number of auditors at once, each a whole subagent's tokens.
+SWEEP_EVERY=25
+SWEEP_WIDTH=5
+
 # The only GitHub writes the guard lets through. ISSUES_REPO (owner/name):
 # gh issue create, edit, comment, close and reopen, each with --repo naming
 # it; state.sh reads its issues and discussions. ISSUES_PROJECT
