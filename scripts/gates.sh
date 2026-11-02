@@ -99,10 +99,17 @@ rm -f "$SCRATCH/stop-blocks"
 status=0
 
 if [ "$mode" = all ] || [ "$mode" = pytest ]; then
+    # The display: -a takes the first number without a lock file, so two runs
+    # started together both take :99. One Xvfb dies, both suites share the
+    # other, the first to finish takes it from under the second, and the run
+    # whose Xvfb died ends in 1 whatever pytest returned (its `kill` fails under
+    # set -e). -d lets Xvfb pick a free one itself; not every xvfb-run has it.
+    display=-a
+    xvfb-run --help 2>&1 | grep -q -- --auto-display && display=-d
     # The CI's screen: xvfb-run's own default is 640x480 here, and a window
     # is as large as the screen lets it be.
     env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 "$T_PYTEST" \
-        xvfb-run -a -s "-screen 0 1280x1024x24" python3 -m pytest test/ -q -n "$WORKERS" \
+        xvfb-run "$display" -s "-screen 0 1280x1024x24" python3 -m pytest test/ -q -n "$WORKERS" \
         > "$logs/pytest.txt" 2>&1
     rc=$?
     # Grep, never tail: the summary line is interleaved with warning output.

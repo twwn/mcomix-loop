@@ -364,7 +364,7 @@ last suite run reached. What it runs, for probes that need a variant:
 
 ```sh
 env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 60 \
-    xvfb-run -a -s "-screen 0 1280x1024x24" python3 -m pytest test/ -q -n 8
+    xvfb-run -d -s "-screen 0 1280x1024x24" python3 -m pytest test/ -q -n 8
 timeout -k 5 60  python3 -m flake8 --select=F mcomix/ test/   # must be silent
 timeout -k 5 120 python3 -m mypy mcomix                        # must report no issues
 ```
@@ -373,6 +373,10 @@ Run outside `xvfb-run`, the suite hangs rather than failing. The screen is
 the CI's: `xvfb-run`'s own default is smaller (640x480 here), a window is as
 large as the screen lets it be, and tests have passed at one size and failed
 at the other. A probe that measures or shows a window takes the same `-s`.
+`-d` has Xvfb pick a free display. `-a`, which older techniques name, takes the
+first number without a lock file: two started together both take `:99`, and
+one then exits 1 whatever its command returned, so a suite that reports
+everything passed and still fails has met this first.
 `-n 8` is
 `WORKERS` from `STATE/config.sh`, measured for the machine; `-n auto` is
 slower because worker start-up dominates a suite this short.
@@ -587,7 +591,9 @@ favour and run the gates again. Never rebase or amend anything of theirs.
 Work one campaign at a time and pick nothing else while it is open. Fan work
 out to subagents only where the units are independent — modules that do not
 import one another — and merge the branches back into `loop/<campaign>` one
-at a time with the gates run over the union. Pieces that share scaffolding,
+at a time with the gates run over the union. Gates may run at once in separate
+worktrees (`--tree`), but never `--export`, which removes every other export.
+Pieces that share scaffolding,
 such as several views over one model, stay in one thread. A subagent with
 `isolation: "worktree"` branches from `BRANCH` (only because
 `worktree.baseRef` is `head` in settings), not from the campaign branch; to

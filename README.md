@@ -128,6 +128,7 @@ At the second wakeup, `/context` shows the skill once, not twice.
 - **`scripts/state.sh`** – the first command of every iteration. It prints the checkout and its branch, the tree, the commits since the notes' baseline, the issues and discussions on GitHub, the notes and the names of the techniques.
 - **`scripts/gates.sh`** – runs the suite, then flake8 beside mypy, each with a hard timeout. It prints one line per gate.
 - **Exported trees** – `gates.sh --export` measures a clean `git archive`. Exports share one mypy cache, so mypy takes a second there, not half a minute.
+- **Worktrees** – `gates.sh --tree` keeps the logs of a tree other than the checkout in `state/scratch/logs/<tree>/`, so gates can run at once in two worktrees. Exports cannot: each new one removes the last.
 - **`guard.sh`** – PreToolUse hook. It enforces the never-rules. It notes each commit the loop makes, to know its own later.
 - **`stop-check.sh`** – Stop hook. It keeps a turn going while the gates ran after the notes were last written, or while the bundle is broken. It counts only its own session's gate runs. It never holds back a session outside a checkout.
 - **Compaction hook** – SessionStart, on compaction. It prints `invariants.md`.
