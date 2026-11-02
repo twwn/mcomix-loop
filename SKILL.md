@@ -357,9 +357,10 @@ on `LOOP_NOTES` is exactly why it exists.
 All three, before every commit, by one command:
 `${CLAUDE_SKILL_DIR}/scripts/gates.sh [pytest|static|deprecations]
 [--tree <dir>] [--export[=<rev>]]`. It prints one line per gate and leaves
-the full logs in `SCRATCH/pytest.txt`, `flake8.txt` and `mypy.txt`;
-`deprecations` lists the `DeprecationWarning` names the last suite run
-reached. What it runs, for probes that need a variant:
+the full logs in `SCRATCH/pytest.txt`, `flake8.txt` and `mypy.txt` (for a
+`--tree` other than the checkout, in `SCRATCH/logs/<tree>/`; its last line
+names the directory); `deprecations` lists the `DeprecationWarning` names the
+last suite run reached. What it runs, for probes that need a variant:
 
 ```sh
 env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 60 \
