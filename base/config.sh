@@ -9,10 +9,11 @@ T_FLAKE8=60
 T_MYPY=120
 
 # Where `gates.sh --export` unpacks a clean tree (default: state/scratch/).
-# On Python 3.12 and 3.13 the forkserver listens on a socket file whose path
-# Linux caps at 108 bytes, and the suite puts its temporary files inside the
-# tree, so an export under a long path fails every test that opens a PDF
-# ("AF_UNIX path too long"). 3.14 uses abstract sockets and is not affected.
+# On Python 3.12, and 3.13 before 3.13.6, the forkserver listens on a socket file
+# whose path Linux caps at 108 bytes, and the suite puts its temporary files
+# inside the tree, so an export under a long path fails every test that opens a
+# PDF ("AF_UNIX path too long"). From 3.13.6 on, 3.14 and 3.15 included, Python
+# falls back to the system's temporary directory when the path would be too long.
 # EXPORT_DIR=/tmp/mcomix-loop
 
 # Checkouts that other sessions own, as absolute paths. The guard refuses any

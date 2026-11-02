@@ -78,7 +78,7 @@ Then:
 
    Three parts describe one installation. Adapt them:
 
-   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once; `SWEEP_MODEL` and `SWEEP_EFFORT` what they run at (Sonnet, high), which the loop may change for one lens of a sweep, up to Opus, high.
+   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12, or 3.13 before 3.13.6, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once; `SWEEP_MODEL` and `SWEEP_EFFORT` what they run at (Sonnet, high), which the loop may change for one lens of a sweep, up to Opus, high.
    - `project.md` – replace the author's facts with yours: where your fork stands, how you release, which campaigns are finished.
    - `decisions/` – the author's rulings, one file each. Keep those tagged `program` if you build on this fork: they say why the program behaves as it does. Delete those tagged `installation`. Confirm the ones you keep: `python3 scripts/okf.py confirm --as <you> state/decisions/*.md`.
 
