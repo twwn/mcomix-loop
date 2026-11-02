@@ -93,16 +93,19 @@ Then:
    - `allow` – `gh issue close` on the repository `ISSUES_REPO` names, so that closing an issue does not wait on the classifier. Replace `twwn/mcomix` with yours, or drop the rule if `ISSUES_REPO` stays unset. The guard still checks the command first.
    - `deny` – MComix's real data.
    - `BASH_DEFAULT_TIMEOUT_MS` – the full gates take longer than the Bash tool's two-minute default.
+   - `cleanupPeriodDays` – days before Claude Code deletes transcripts. The default of 30 removes those the loop's commit messages cite as evidence.
    - `attribution.commit` – the commit trailer. Empty, so the loop's commits carry none. Yours to change.
    - `worktree.baseRef: head` – keeps subagent worktrees off `origin/master`.
    - `hooks.PreToolUse` – the guard for the loop's subagents. A skill's own hooks do not fire inside a subagent, so without this one they run unguarded, and `state.sh` says so. It runs on every Bash, Monitor, Write and Edit call of every session. Outside the loop's subagents it exits at once, after a few milliseconds, and it does nothing if the skill is not installed.
 
 3. **Hide `.claude/` in the checkout:** `echo '.claude/' >> .git/info/exclude`. The campaign worktree and Claude Code's subagent worktrees live there. The loop reads an untracked path in `git status` as someone's work in progress.
 
-4. **Turn off auto memory in the checkout:** `{"autoMemoryEnabled": false}` in its `.claude/settings.local.json`.
+4. **Turn off auto memory and shrink the context in the checkout:** `{"autoMemoryEnabled": false, "autoCompactWindow": 300000}` in its `.claude/settings.local.json`.
 
    Auto memory is a second, uncurated memory, and its index loads into every session.
    Left on, it collects rulings that belong in `decisions/`, and its stale entries contradict the curated files.
+
+   `autoCompactWindow` – iterations share one session, and every request reads its whole context again, which is most of what the loop costs. Without it, a month of requests averaged 366k tokens of context. Replaying them at 300k cost about 46% less by list-price ratios, an upper bound that ignores what is read again after a compaction.
    The guard refuses the loop's writes there anyway; the setting spares the refused attempts.
    It applies to every session in that checkout, interactive ones too.
 
