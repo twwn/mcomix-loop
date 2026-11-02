@@ -78,7 +78,7 @@ Then:
 
    Three parts describe one installation. Adapt them:
 
-   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once.
+   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once; `SWEEP_MODEL` and `SWEEP_EFFORT` what they run at (Sonnet, high), which the loop may change for one lens of a sweep, up to Opus, high.
    - `project.md` – replace the author's facts with yours: where your fork stands, how you release, which campaigns are finished.
    - `decisions/` – the author's rulings, one file each. Keep those tagged `program` if you build on this fork: they say why the program behaves as it does. Delete those tagged `installation`. Confirm the ones you keep: `python3 scripts/okf.py confirm --as <you> state/decisions/*.md`.
 
@@ -129,7 +129,7 @@ At the second wakeup, `/context` shows the skill once, not twice.
 
 - **`SKILL.md`** – the protocol. Its body is static, so it costs its tokens once per session and once after each compaction.
 - **`scripts/state.sh`** – the first command of every iteration. It prints the checkout and its branch, the tree, the commits since the notes' baseline, the issues and discussions on GitHub, the notes and the names of the techniques.
-- **`sweep.md`, `scripts/sweep.sh`** – the sweep: how the loop runs one, what an auditor is told, and the lenses. Read only when a sweep is due. Each lens's result goes into `state/sweeps.log`. A lens runs until it finds nothing, then rests until enough commits have come.
+- **`sweep.md`, `scripts/sweep.sh`** – the sweep: how the loop runs one, what an auditor is told, and the lenses. Read only when a sweep is due. Each lens's result and tier go into `state/sweeps.log`. A lens runs until it finds nothing, then rests until enough commits have come.
 - **`scripts/gates.sh`** – runs the suite, then flake8 beside mypy, each with a hard timeout. It prints one line per gate.
 - **Exported trees** – `gates.sh --export` measures a clean `git archive`. Exports share one mypy cache, so mypy takes a second there, not half a minute.
 - **Worktrees** – `gates.sh --tree` keeps the logs of a tree other than the checkout in `state/scratch/logs/<tree>/`, so gates can run at once in two worktrees. Exports cannot: each new one removes the last.

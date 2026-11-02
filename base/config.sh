@@ -23,8 +23,15 @@ FOREIGN=()
 # Sweeps, when no lead can be worked (sweep.md). A lens that found nothing runs
 # again after SWEEP_EVERY commits under mcomix/ or docs/; 0 means no sweeps.
 # SWEEP_WIDTH is the number of auditors at once, each a whole subagent's tokens.
+# SWEEP_MODEL (haiku, sonnet, opus, fable) and SWEEP_EFFORT (low, medium, high,
+# xhigh, max) are what an auditor runs at. The main thread checks every lead
+# itself, so a cheaper auditor's false leads come back as its own cost, and a lens
+# that misses what is there rests. It may name another tier for a lens of one
+# sweep, up to opus/high (sweep.md).
 SWEEP_EVERY=25
 SWEEP_WIDTH=5
+SWEEP_MODEL=sonnet
+SWEEP_EFFORT=high
 
 # The only GitHub writes the guard lets through. ISSUES_REPO (owner/name):
 # gh issue create, edit, comment, close and reopen, each with --repo naming
