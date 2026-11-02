@@ -48,6 +48,12 @@ fi
 REPO=$(resolve_repo "${cwd:-}") \
     || deny "this session's working directory is not an MComix checkout (mcomix/, test/, mcomix/constants.py); the loop only runs from inside one. Start claude there. To work on the skill itself, start a session without /mcomix-loop."
 CAMPAIGN=$REPO/.claude/worktrees/campaign
+# Where a git command without -C runs: the checkout, or the worktree a subagent
+# was started in. Not cwd as such: the main thread's can drift into state/.
+case "${cwd:-}" in
+    "$REPO"/.claude/worktrees/*) HERE=$cwd ;;
+    *) HERE=$REPO ;;
+esac
 
 # Only the loop's session runs this hook in its main thread, so every call
 # leaves that session's mark: subagent-guard.sh guards its subagents by it.
@@ -210,7 +216,7 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
     while [ $# -gt 0 ]; do
         t=$1; shift
         case "$t" in
-            -C) git_dir=${1:-}; case "$git_dir" in /*) ;; *) git_dir=${cwd:-$REPO}/$git_dir ;; esac; shift ;;
+            -C) git_dir=${1:-}; case "$git_dir" in /*) ;; *) git_dir=$HERE/$git_dir ;; esac; shift ;;
             -c|--git-dir|--work-tree|--namespace|--exec-path|--super-prefix) shift ;;  # global option with a value
             -*) ;;                                                                        # other global option
             *) sub=$t; break ;;
@@ -229,7 +235,7 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
             deny "git push: what leaves this machine is the user's decision." ;;
         commit)
             if [[ "$args" == *" --amend "* ]]; then
-                target=${cwd:-$REPO}      # a subagent's worktree, not the checkout, for one started in it
+                target=$HERE
                 [ -n "${git_dir:-}" ] && target=$git_dir
                 head=$(git -C "$target" rev-parse -q --verify HEAD 2>/dev/null)
                 amend_help="Fix a message the loop got wrong: its own unpushed newest commit with 'git commit --amend --only -F <file>'; any other with 'git notes append -F <file> <commit>'."
@@ -254,7 +260,7 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
             # Recorded before it runs: the parent it will sit on and the subject it
             # will have. That is how an amend later tells the loop's own commit
             # from one the user made by hand, whatever the commit printed.
-            ctarget=${cwd:-$REPO}; [ -n "${git_dir:-}" ] && ctarget=$git_dir
+            ctarget=$HERE; [ -n "${git_dir:-}" ] && ctarget=$git_dir
             if [[ "$args" == *" --amend "* ]]; then
                 cparent=$(git -C "$ctarget" rev-parse -q --verify "HEAD^" 2>/dev/null)
             else
