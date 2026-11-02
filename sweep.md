@@ -18,8 +18,9 @@ here.
    `general-purpose`, `isolation` `worktree`, `description` `Sweep: <lens>`,
    `prompt` as printed, with nothing added. The calls return at once.
 3. Run `sweep.sh wait` again and again, in the foreground, until it says that
-   all are in or that the deadline has passed. Do nothing else meanwhile; the
-   auditors' notifications say nothing their reports do not.
+   all are in or that the deadline has passed. While it says to wait, do not end
+   the turn and do nothing else. An auditor's notification says nothing its
+   report does not, and changes nothing here: go back to `wait`.
 4. Read the reports, `SCRATCH/sweep/<lens>.md`, and check each lead as step 5 of
    "Start of every iteration" does: `grep -n` its place in `REJECTED`, then run
    its command yourself, from `REPO`, at HEAD. A probe under `SCRATCH/sweep/`
@@ -50,8 +51,9 @@ padded one costs the loop more than it gains.
 
 Your working directory is a worktree of commit {COMMIT}, used by nothing else.
 Check with `git rev-parse --short HEAD`; if it prints another commit, say so in
-the first line of your report. Read and run there. `cd` does not carry from one
-Bash call to the next, and the shell is zsh.
+the first line of your report. Read and run there. It is removed when you finish,
+so nothing you report may name its path. `cd` does not carry from one Bash call
+to the next, and the shell is zsh.
 
 1. **Know what is known.** The leads and questions below are known already.
    `{REJECTED}` holds what was examined and left alone, one line each beginning
@@ -70,10 +72,13 @@ Bash call to the next, and the shell is zsh.
    means anything.
 3. **Show it.** For each candidate, the smallest command that shows it happen: a
    probe built on `test/__init__.py:MComixTest`, kept under `{PROBES}` and run
-   with `PYTHONPATH=$PWD`, or a test of the suite run with a changed input. Then
-   try to prove yourself wrong: a probe that surprises you is wrong until shown
-   otherwise. What timing will not let you show (a race) may be reported by its
-   chain of file:line, marked `unproven`; it ranks below what you showed.
+   with `PYTHONPATH=$PWD`, or a test of the suite run with a changed input. Every
+   script goes under `{PROBES}`, a throwaway one too, and none under `/tmp`: the
+   main thread runs your command again from another tree, so it has to work from
+   any checkout. Then try to prove yourself wrong: a probe that surprises you is
+   wrong until shown otherwise. What timing will not let you show (a race) may be
+   reported by its chain of file:line, marked `unproven`; it ranks below what you
+   showed.
    Everything runs in the foreground inside `timeout -k 5 <seconds>`. A subset of
    the suite, never all of it:
    `env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 60 xvfb-run -d -s "-screen 0 1280x1024x24" python3 -m pytest test/<file> -q -n 2`
