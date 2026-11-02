@@ -2,8 +2,10 @@
 # Sweeps: auditors, one lens each, for when the loop's leads run out (sweep.md).
 #
 #   sweep.sh status             an open sweep, the lenses due and those resting (state.sh prints it)
-#   sweep.sh start [lens...]    opens a sweep of the lenses due, or those named:
-#                               writes a brief for each and prints its prompt
+#   sweep.sh start [lens[=model/effort]...]
+#                               opens a sweep of the lenses due, or those named:
+#                               writes a brief for each and prints its model,
+#                               effort and prompt
 #   sweep.sh wait               blocks while the Bash tool lets it, then says which reports are in
 #   sweep.sh done <lens> <returned> <survived>
 #                               records a lens's result, `-` and `-` if it never
@@ -19,6 +21,10 @@
 # While $SWEEP/started exists, guard.sh holds the subagents to what an auditor
 # needs. wait's slice stays under the Bash tool's timeout, which would otherwise
 # move it to the background.
+#
+# A lens runs at SWEEP_MODEL and SWEEP_EFFORT unless `start` names another tier
+# for it. The loop picks unattended, so what it may name stops at opus/high; only
+# config.sh goes higher. `done` adds the tier to the lens's line in sweeps.log.
 
 set -u
 case "$0" in */*) . "${0%/*}/paths.sh" ;; *) . ./paths.sh ;; esac
@@ -26,6 +32,7 @@ REPO=$(resolve_repo) || { echo "sweep: $PWD is not an MComix checkout" >&2; exit
 DOC=$SKILL_DIR/sweep.md
 STARTED=$SWEEP/started
 LOGGED=$SWEEP/logged
+TIERS=$SWEEP/tiers
 DEADLINE=3600     # seconds an auditor has; a past one took 22 minutes over more than this asks
 
 die() { echo "sweep: $1" >&2; exit 2; }
@@ -130,12 +137,21 @@ start() {
     subagents_guarded "$REPO" || die "subagents run without the guard until the hook in settings-snippet.json is merged"
     [ ! -e "$REPO/.claude/worktrees/campaign" ] || die "a campaign is open"
     [ ! -e "$STARTED" ] || die "a sweep is open: $(reports_line). Finish it with sweep.sh done."
-    local -a chosen rest
+    [[ "$SWEEP_MODEL" =~ ^(haiku|sonnet|opus|fable)$ ]] || die "SWEEP_MODEL in $STATE/config.sh is haiku, sonnet, opus or fable, not $SWEEP_MODEL"
+    [[ "$SWEEP_EFFORT" =~ ^(low|medium|high|xhigh|max)$ ]] || die "SWEEP_EFFORT in $STATE/config.sh is low, medium, high, xhigh or max, not $SWEEP_EFFORT"
+    local -a chosen=() rest
+    local -A tier=()
     if [ $# -gt 0 ]; then
-        chosen=("$@")
-        local lens
-        for lens in "${chosen[@]}"; do
+        local arg lens
+        for arg in "$@"; do
+            lens=${arg%%=*}
             lenses | grep -qxF -- "$lens" || die "no lens named $lens in $DOC"
+            if [ "$lens" != "$arg" ]; then
+                [[ "${arg#*=}" =~ ^(haiku|sonnet|opus)/(low|medium|high)$ ]] \
+                    || die "$arg: a tier is <haiku|sonnet|opus>/<low|medium|high>"
+                tier[$lens]=${arg#*=}
+            fi
+            chosen+=("$lens")
         done
     else
         sort_lenses chosen rest
@@ -150,9 +166,15 @@ start() {
         mkdir -p "$SWEEP/$lens"
         brief "$lens" "$commit" > "$SWEEP/$lens.brief.md" || exit 2
     done
+    local t
+    for lens in "${chosen[@]}"; do
+        t=${tier[$lens]:-$SWEEP_MODEL/$SWEEP_EFFORT}
+        printf '%s\t%s\t%s\n' "$lens" "${t%/*}" "${t#*/}" >> "$TIERS"
+    done
     printf '%s\n%s\n%s\n' "$(now)" "$commit" "${chosen[*]}" > "$STARTED"
     for lens in "${chosen[@]}"; do
-        echo "$lens: Read $SWEEP/$lens.brief.md in full and do what it says."
+        t=${tier[$lens]:-$SWEEP_MODEL/$SWEEP_EFFORT}
+        echo "$lens ${t%/*} ${t#*/}: Read $SWEEP/$lens.brief.md in full and do what it says."
     done
 }
 
@@ -182,7 +204,8 @@ finish() {   # finish <lens> <returned> <survived>
     [[ "$returned" =~ ^([0-9]+|-)$ && "$survived" =~ ^([0-9]+|-)$ ]] || die "returned and survived are numbers, or - for a lens that never reported"
     { read -r at; read -r commit; } < "$STARTED"
     if ! grep -qxF -- "$lens" "$LOGGED" 2>/dev/null; then
-        printf '%s\t%s\t%s\t%s\t%s\n' "$(now)" "$lens" "$commit" "$returned" "$survived" >> "$SWEEPS"
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(now)" "$lens" "$commit" "$returned" "$survived" \
+            "$(awk -F'\t' -v l="$lens" '$1 == l { print $2 "\t" $3 }' "$TIERS" 2>/dev/null)" >> "$SWEEPS"
         printf '%s\n' "$lens" >> "$LOGGED"
     fi
     names=$(sweep_lenses)
@@ -198,6 +221,6 @@ case "${1:-}" in
     start) shift; start "$@" ;;
     wait) wait_reports ;;
     done) shift; finish "$@" ;;
-    -h|--help) sed -n '2,21p' "$0" ;;
-    *) die "status, start [lens...], wait, or done <lens> <returned> <survived>" ;;
+    -h|--help) sed -n '2,27p' "$0" ;;
+    *) die "status, start [lens[=model/effort]...], wait, or done <lens> <returned> <survived>" ;;
 esac

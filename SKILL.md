@@ -69,7 +69,8 @@ as it is.
   pruned; one proven wrong is corrected in place with Edit, "(reopened at
   <commit>: ...)"; the shell may only append to it. Never read whole:
   `grep -n` it.
-- `STATE/sweeps.log` — what each lens of each sweep returned and what survived;
+- `STATE/sweeps.log` — what each lens of each sweep returned, what survived and
+  at what model and effort;
   `sweep.sh` writes it (see `sweep.md`).
 - `STATE/probes/` — probes that proved themselves, under the names the
   techniques give them. One named but missing (`state.sh` lists them) is

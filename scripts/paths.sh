@@ -14,7 +14,7 @@
 #   SCRATCH    $STATE/scratch          gate logs, exports, iteration.txt; not part of the bundle
 #   SESSIONS   $SCRATCH/sessions       one empty file per session the guard has run in (subagent-guard.sh)
 #   SWEEP      $SCRATCH/sweep          the open sweep's briefs, probes and reports (sweep.sh)
-#   SWEEPS     $STATE/sweeps.log       what each lens of each sweep returned and what survived (sweep.sh)
+#   SWEEPS     $STATE/sweeps.log       what each lens of each sweep returned, what survived and at what model and effort (sweep.sh)
 #   CAMPAIGN  $REPO/.claude/worktrees/campaign — inside the project directory,
 #             next to where the harness puts subagent worktrees, so no extra
 #             permission scope is needed; .claude/ must be in .git/info/exclude.
@@ -53,6 +53,8 @@ ISSUES_REPO=""     # owner/name whose issues the loop may write with gh; empty: 
 ISSUES_PROJECT=""  # owner/number of the GitHub project whose items it may write; empty: none
 SWEEP_EVERY=25     # commits under mcomix/ or docs/ before a lens that found nothing runs again; 0: no sweeps
 SWEEP_WIDTH=5      # auditors at once
+SWEEP_MODEL=sonnet # the model and effort of an auditor, unless the sweep names another for its lens
+SWEEP_EFFORT=high
 # shellcheck disable=SC1091
 [ -r "$STATE/config.sh" ] && . "$STATE/config.sh"
 

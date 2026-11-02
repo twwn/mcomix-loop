@@ -11,12 +11,23 @@ here.
 ## The main thread
 
 1. Run `${CLAUDE_SKILL_DIR}/scripts/sweep.sh start`, which takes the lenses due
-   (or those named after `start`). It writes a brief for each and prints one
-   line per lens: `<lens>: <prompt>`. Append "sweep open: read sweep.md" to
-   `SCRATCH/iteration.txt`.
+   (or those named after `start`) at the configured tier. It writes a brief for
+   each and prints one line per lens: `<lens> <model> <effort>: <prompt>`. Append
+   "sweep open: read sweep.md" to `SCRATCH/iteration.txt`.
+
+   To give a lens another tier, name every lens that is due, the tier on those
+   that differ: `sweep.sh start twins docs=sonnet/medium outside=opus/high`.
+   Each lens's last run is in `STATE/sweeps.log`: time, lens, commit, returned,
+   survived, model, effort. Name a tier only for one of these reasons:
+   - **Up to `opus/high`:** in its last run at this tier, most of the lens's
+     leads did not survive. A checked false lead costs the main thread more than
+     the auditor saves.
+   - **Down to `sonnet/medium`:** `docs` or `twins`, whose work is comparing
+     lists, if every lead of the last run survived.
 2. One `Agent` call per line, all in one message: `subagent_type`
    `general-purpose`, `isolation` `worktree`, `description` `Sweep: <lens>`,
-   `prompt` as printed, with nothing added. The calls return at once.
+   `model` and `effort` as printed, `prompt` as printed, with nothing added. The
+   calls return at once.
 3. Run `sweep.sh wait` again and again, in the foreground, until it says that
    all are in or that the deadline has passed. While it says to wait, do not end
    the turn and do nothing else. An auditor's notification says nothing its
