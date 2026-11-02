@@ -12,7 +12,10 @@
 #                   main repository, unpacked under the scratch directory
 #
 # Exit 0 when every gate that ran passed, 1 otherwise, 2 on a usage error.
-# Full logs: <skill>/state/scratch/{pytest,flake8,mypy}.txt
+# Full logs: <skill>/state/scratch/{pytest,flake8,mypy}.txt; for a --tree other
+# than the checkout, <skill>/state/scratch/logs/<tree>/, so that gates running
+# at once in two worktrees (subagents of a campaign) keep their logs apart. The
+# last line names the directory.
 #
 # A tree under the scratch or export directory shares one mypy cache,
 # <skill>/state/scratch/mypy-cache. An export is new every time, and mypy
@@ -47,17 +50,29 @@ done
 
 mkdir -p "$SCRATCH"
 
+case "$tree" in /*) ;; *) tree=$REPO/$tree ;; esac         # --tree may be relative to the checkout
+logs=$SCRATCH
+if [ -z "$export_rev" ]; then
+    cd "$tree" || { echo "gates: cannot cd to $tree" >&2; exit 2; }
+    tree=$PWD
+    if [ "$tree" != "$REPO" ]; then
+        name=${tree#"$REPO"/.claude/worktrees/}; name=${name#"$SCRATCH"/}; name=${name#/}
+        logs=$SCRATCH/logs/${name//\//_}
+        mkdir -p "$logs"
+    fi
+fi
+
 if [ "$mode" = deprecations ]; then
-    if [ ! -s "$SCRATCH/pytest.txt" ]; then
-        echo "gates: no pytest log in $SCRATCH; run the suite first" >&2
+    if [ ! -s "$logs/pytest.txt" ]; then
+        echo "gates: no pytest log in $logs; run the suite first" >&2
         exit 2
     fi
-    echo "deprecations reached by the last suite run ($(stat -c %y "$SCRATCH/pytest.txt" | cut -d. -f1)):"
+    echo "deprecations reached by the last suite run ($(stat -c %y "$logs/pytest.txt" | cut -d. -f1)):"
     # A name is what follows DeprecationWarning or a subclass (PyGObject's
     # PyGIDeprecationWarning names its own API). PytestDeprecationWarning
     # is about pytest's configuration and names nothing: its "The" once
     # passed for a sixteenth name.
-    grep -oE '[[:alnum:]_]*DeprecationWarning: [^[:space:]]+' "$SCRATCH/pytest.txt" \
+    grep -oE '[[:alnum:]_]*DeprecationWarning: [^[:space:]]+' "$logs/pytest.txt" \
         | grep -v '^PytestDeprecationWarning:' | sort -u
     exit 0
 fi
@@ -69,10 +84,9 @@ if [ -n "$export_rev" ]; then
     mkdir -p "$tree"
     git -C "$REPO" archive "$export_rev" | tar -x -C "$tree" || exit 2
     echo "export: $export_rev ($sha) unpacked at $tree"
+    cd "$tree" || { echo "gates: cannot cd to $tree" >&2; exit 2; }
 fi
 
-case "$tree" in /*) ;; *) tree=$REPO/$tree ;; esac         # --tree may be relative to the checkout
-cd "$tree" || { echo "gates: cannot cd to $tree" >&2; exit 2; }
 mypy_cache=()
 case "$tree" in "$SCRATCH"/*|"$EXPORT_DIR"/*) mypy_cache=(--cache-dir "$SCRATCH/mypy-cache") ;; esac
 
@@ -89,15 +103,15 @@ if [ "$mode" = all ] || [ "$mode" = pytest ]; then
     # is as large as the screen lets it be.
     env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 "$T_PYTEST" \
         xvfb-run -a -s "-screen 0 1280x1024x24" python3 -m pytest test/ -q -n "$WORKERS" \
-        > "$SCRATCH/pytest.txt" 2>&1
+        > "$logs/pytest.txt" 2>&1
     rc=$?
     # Grep, never tail: the summary line is interleaved with warning output.
-    summary=$(grep -E '[0-9]+ (passed|failed|error)' "$SCRATCH/pytest.txt" | tail -1)
+    summary=$(grep -E '[0-9]+ (passed|failed|error)' "$logs/pytest.txt" | tail -1)
     if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
-        echo "pytest: HUNG, killed after ${T_PYTEST}s (a hang is a finding); last line: $(tail -1 "$SCRATCH/pytest.txt")"
+        echo "pytest: HUNG, killed after ${T_PYTEST}s (a hang is a finding); last line: $(tail -1 "$logs/pytest.txt")"
         status=1
     elif [ "$rc" -ne 0 ] || [ -z "$summary" ]; then
-        echo "pytest: FAILED (exit $rc): ${summary:-no summary line; see $SCRATCH/pytest.txt}"
+        echo "pytest: FAILED (exit $rc): ${summary:-no summary line; see $logs/pytest.txt}"
         status=1
     else
         echo "pytest: $summary"
@@ -108,16 +122,16 @@ if [ "$mode" = all ] || [ "$mode" = static ]; then
     # Independent of each other, so flake8 runs beside mypy. The suite runs
     # alone: beside them it would run slower, and nearer its timeout.
     timeout -k 5 "$T_FLAKE8" python3 -m flake8 --select=F mcomix/ test/ \
-        > "$SCRATCH/flake8.txt" 2>&1 &
+        > "$logs/flake8.txt" 2>&1 &
     flake8_pid=$!
-    timeout -k 5 "$T_MYPY" python3 -m mypy ${mypy_cache[@]+"${mypy_cache[@]}"} mcomix > "$SCRATCH/mypy.txt" 2>&1
+    timeout -k 5 "$T_MYPY" python3 -m mypy ${mypy_cache[@]+"${mypy_cache[@]}"} mcomix > "$logs/mypy.txt" 2>&1
     mypy_rc=$?
     wait "$flake8_pid"
     rc=$?
     if [ "$rc" -eq 124 ]; then
         echo "flake8: HUNG, killed after ${T_FLAKE8}s"; status=1
-    elif [ "$rc" -ne 0 ] || [ -s "$SCRATCH/flake8.txt" ]; then
-        echo "flake8: $(wc -l < "$SCRATCH/flake8.txt") lines (exit $rc); first: $(head -1 "$SCRATCH/flake8.txt")"
+    elif [ "$rc" -ne 0 ] || [ -s "$logs/flake8.txt" ]; then
+        echo "flake8: $(wc -l < "$logs/flake8.txt") lines (exit $rc); first: $(head -1 "$logs/flake8.txt")"
         status=1
     else
         echo "flake8: silent"
@@ -127,10 +141,10 @@ if [ "$mode" = all ] || [ "$mode" = static ]; then
     if [ "$rc" -eq 124 ]; then
         echo "mypy: HUNG, killed after ${T_MYPY}s"; status=1
     elif [ "$rc" -ne 0 ]; then
-        echo "mypy: FAILED (exit $rc): $(tail -1 "$SCRATCH/mypy.txt")"
+        echo "mypy: FAILED (exit $rc): $(tail -1 "$logs/mypy.txt")"
         status=1
     else
-        echo "mypy: $(tail -1 "$SCRATCH/mypy.txt")"
+        echo "mypy: $(tail -1 "$logs/mypy.txt")"
     fi
 fi
 
@@ -143,5 +157,5 @@ elif prefix=$(git rev-parse --show-prefix 2>/dev/null) && [ -z "$prefix" ]; then
 else
     at="no checkout of its own"
 fi
-echo "tree: $tree at $at; logs: $SCRATCH"
+echo "tree: $tree at $at; logs: $logs"
 exit $status
