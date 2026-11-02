@@ -6,10 +6,11 @@ You start it once, with `/loop /mcomix-loop`.
 It wakes every minute; when all that is left waits on a CI run, after up to fifteen.
 Each time, it takes as many leads as it can finish and verify: a bug, a measured slowdown, an incomplete feature, a refactor with a mechanical proof.
 It commits each one, writes itself notes and schedules the next wakeup.
+When no lead is left, it looks for more with a sweep: auditors, one line of inquiry each, whose findings it checks before it believes them.
 
 It stops by itself for three reasons only:
 
-- **Quiet** – three iterations in a row committed nothing and advanced no campaign.
+- **Quiet** – three iterations in a row committed nothing, advanced no campaign and left no lead from a sweep.
 - **Stuck** – a gate broke, and it can neither fix nor attribute the cause.
 - **Your call** – a decision that is yours is all that is left. Until then the question waits in its notes, and it works the other leads.
 
@@ -32,6 +33,7 @@ The loop runs unattended.
 - **Keeps out of your MComix data** – `~/.config/mcomix` and `~/.local/share/mcomix`. The hook refuses both. With the settings snippet merged, Claude Code denies them too.
 - **Uses `auto` permission mode** – a permission prompt would stall a loop nobody watches. Claude Code's classifier still reviews every command but one: closing an issue in your repository, which the settings snippet allows.
 - **May open a git worktree** – at `<checkout>/.claude/worktrees/campaign`, for a change too large for one commit. Only for a campaign you approved.
+- **May start subagents** – when no lead can be worked, up to five auditors, each in a worktree of its own under `<checkout>/.claude/worktrees/`. They change nothing in the checkout, commit nothing and post nothing, and the guard holds them to it. Each costs a subagent's tokens, so a sweep costs about what several iterations do. It needs the guard's hook in your settings. `SWEEP_EVERY=0` in `config.sh` turns sweeps off.
 
 If that is more than you want an unattended process to do, do not install it.
 
@@ -76,7 +78,7 @@ Then:
 
    Three parts describe one installation. Adapt them:
 
-   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`.
+   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12 or 3.13, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once.
    - `project.md` – replace the author's facts with yours: where your fork stands, how you release, which campaigns are finished.
    - `decisions/` – the author's rulings, one file each. Keep those tagged `program` if you build on this fork: they say why the program behaves as it does. Delete those tagged `installation`. Confirm the ones you keep: `python3 scripts/okf.py confirm --as <you> state/decisions/*.md`.
 
@@ -127,6 +129,7 @@ At the second wakeup, `/context` shows the skill once, not twice.
 
 - **`SKILL.md`** – the protocol. Its body is static, so it costs its tokens once per session and once after each compaction.
 - **`scripts/state.sh`** – the first command of every iteration. It prints the checkout and its branch, the tree, the commits since the notes' baseline, the issues and discussions on GitHub, the notes and the names of the techniques.
+- **`sweep.md`, `scripts/sweep.sh`** – the sweep: how the loop runs one, what an auditor is told, and the lenses. Read only when a sweep is due. Each lens's result goes into `state/sweeps.log`. A lens runs until it finds nothing, then rests until enough commits have come.
 - **`scripts/gates.sh`** – runs the suite, then flake8 beside mypy, each with a hard timeout. It prints one line per gate.
 - **Exported trees** – `gates.sh --export` measures a clean `git archive`. Exports share one mypy cache, so mypy takes a second there, not half a minute.
 - **Worktrees** – `gates.sh --tree` keeps the logs of a tree other than the checkout in `state/scratch/logs/<tree>/`, so gates can run at once in two worktrees. Exports cannot: each new one removes the last.
@@ -178,7 +181,7 @@ It copies `state/` into `base/`:
 
 - **Whole** – techniques, probes and `rejected.md`. Also the rulings and `project.md`, as the author's worked example.
 - **Trimmed** – `notes.md`. The sections about one installation are blanked. The gate numbers are marked as a seed.
-- **Never** – `config.sh`, `commits.log` and `scratch/`.
+- **Never** – `config.sh`, `commits.log`, `sweeps.log` and `scratch/`.
 
 It replaces your home path in what it copies.
 It regenerates the index files, adds a `log.md` entry and checks conformance.
@@ -194,6 +197,7 @@ The project-specific parts are in known places:
 - **Gate commands** – `scripts/gates.sh`.
 - **The GTK, xdist and data-path rules** – the "Guardrails", "Verification gates" and "Evidence standards" sections of `SKILL.md`.
 - **The code base's facts** – `reference.md`.
+- **What sweeps look for** – the lenses in `sweep.md`.
 
 The protocol carries over unchanged: state, gates, notes, campaigns, ending, hooks.
 

@@ -3,7 +3,7 @@ name: mcomix-loop
 description: One iteration of the unattended MComix maintenance loop, in the MComix checkout claude was started in. Run only through `/loop /mcomix-loop`; never invoke it for another task.
 argument-hint: "[request for this iteration]"
 effort: high
-allowed-tools: Bash(git *) Bash(cat *) Bash(ls *) Bash(grep *) Bash(test *) Bash(mkdir *) Bash(cp *) Bash(mv *) Bash(diff *) Bash(env *) Bash(timeout *) Bash(xvfb-run *) Bash(python3 *) Bash(msgfmt *) Bash(msgmerge *) Bash(xgettext *) Bash(${CLAUDE_SKILL_DIR}/scripts/gates.sh *) Bash(${CLAUDE_SKILL_DIR}/scripts/state.sh *) Read Edit Write Glob Grep Agent WebFetch(domain:docs.python.org)
+allowed-tools: Bash(git *) Bash(cat *) Bash(ls *) Bash(grep *) Bash(test *) Bash(mkdir *) Bash(cp *) Bash(mv *) Bash(diff *) Bash(env *) Bash(timeout *) Bash(xvfb-run *) Bash(python3 *) Bash(msgfmt *) Bash(msgmerge *) Bash(xgettext *) Bash(${CLAUDE_SKILL_DIR}/scripts/gates.sh *) Bash(${CLAUDE_SKILL_DIR}/scripts/state.sh *) Bash(${CLAUDE_SKILL_DIR}/scripts/sweep.sh *) Read Edit Write Glob Grep Agent WebFetch(domain:docs.python.org)
 disallowed-tools: AskUserQuestion EnterPlanMode ExitPlanMode EnterWorktree ExitWorktree
 hooks:
   PreToolUse:
@@ -69,6 +69,8 @@ as it is.
   pruned; one proven wrong is corrected in place with Edit, "(reopened at
   <commit>: ...)"; the shell may only append to it. Never read whole:
   `grep -n` it.
+- `STATE/sweeps.log` — what each lens of each sweep returned and what survived;
+  `sweep.sh` writes it (see `sweep.md`).
 - `STATE/probes/` — probes that proved themselves, under the names the
   techniques give them. One named but missing (`state.sh` lists them) is
   rebuilt from its description when needed; not a prompt correction.
@@ -96,7 +98,8 @@ the baseline `LOOP_NOTES` names (foreign unless the notes say otherwise),
 the issues and discussions on GitHub (see "Issues and the project"),
 worktrees and `loop/*` branches, `LOOP_NOTES` in full (MISSING means a fresh
 chain), the names of the `LOOP_TECHNIQUES` concepts (Read the one you
-need before writing a probe or benchmark), bundle problems if any, and a
+need before writing a probe or benchmark), bundle problems if any, the sweep
+lenses due, and a
 protocol footer. It is not re-run after a compaction: `SCRATCH/iteration.txt`
 holds what this iteration has found since.
 
@@ -122,9 +125,11 @@ Every iteration ends the same way, whatever it did.
    `PushNotification` naming the reason — for exactly these, and say which:
    - **Three consecutive quiet iterations**, counted by the `Quiet
      iterations` line: increment when nothing was committed, reset when
-     something was or a campaign advanced. When the leads run out,
-     `DECISIONS` or `project.md` may say what comes next — a release commit,
-     a sweep; that is then the lead, and the count starts after it.
+     something was, a campaign advanced or a sweep left a lead. When the leads
+     run out, a sweep of the lenses `state.sh` lists as due comes first (step 6
+     of "Start of every iteration"); after it `DECISIONS` or `project.md` may
+     say what comes next — a release commit, a ticket sweep; that is then the
+     lead, and the count starts after it.
    - **A broken gate you can neither fix nor attribute**, recorded in
      `LOOP_NOTES` first.
    - **A decision that is the user's, with nothing else left to do**: a
@@ -201,6 +206,10 @@ pushes that batch as far as it can.
 6. **Pick**, preferring: a broken gate, a bug that affects users, a measured
    slowdown, an incomplete feature, a refactor. An open campaign outranks all
    of these except a broken gate. The task list is in the Reference section.
+   When no lead can be worked (each is done, stale, or waits on the user or a
+   CI run) and `state.sh` lists lenses as due, the pick is a sweep: Read
+   `sweep.md` beside this file and follow it. An open sweep is finished before
+   anything else.
 
 **Keeping the context small.** A search that would read more than a few
 files ("which modules import X", "where is option Y read") goes to an

@@ -72,6 +72,7 @@ case "$tool" in
             case "$path" in
                 "$SCRATCH"/*) ;;
                 "$STATE"/*) deny "a subagent writes nothing in the bundle: it reports to the main thread, which keeps what it finds. Its own files go under $SCRATCH." ;;
+                *) [ -e "$SWEEP/started" ] && deny "an auditor changes nothing: its probes and its report go under $SWEEP." ;;
             esac
         fi
         case "$path" in
@@ -230,6 +231,12 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
         esac
     done
     [ -z "$sub" ] && return 0
+    if [ -n "$agent" ] && [ -e "$SWEEP/started" ]; then
+        case "$sub" in
+            log|show|diff|status|grep|blame|rev-parse|ls-files|ls-tree|cat-file|describe|shortlog|rev-list|merge-base|name-rev|for-each-ref) ;;
+            *) deny "git $sub: an auditor changes nothing, so git is for reading (log, show, diff, grep, blame and the like)." ;;
+        esac
+    fi
     local args=" $* "
     local tok
     case "$sub" in
@@ -462,14 +469,16 @@ check_gh_project() {   # $1: item-add|item-edit|field-create, then its arguments
     [ -n "$named" ] || deny "gh project $act: name the owner, as 'gh project $act $number --owner $owner'."
 }
 
-# The bundle is the main thread's: a subagent reports to it and writes under
-# SCRATCH. This reads the command text, so it catches the
+# The bundle and the sweep's records are the main thread's: a subagent reports
+# to it and writes under SCRATCH. This reads the command text, so it catches the
 # slip, not a determined way round.
 check_subagent() {   # $1: one segment of a subagent's command
     local rest=${1//[\"\']/}
     case " $rest " in
         *okf.py*" ruling "*|*okf.py*" verified "*|*okf.py*" index "*)
             deny "the bundle is the main thread's: report the ruling or the check to it." ;;
+        *sweep.sh*)
+            deny "sweep.sh is the main thread's: an auditor reports by writing its report." ;;
     esac
     # shellcheck disable=SC2206
     local t=($rest)

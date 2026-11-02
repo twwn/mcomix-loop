@@ -7,4 +7,5 @@ reference.md and state/project.md, and run `python3 <skill>/scripts/okf.py
 rulings`; for a technique, Read state/techniques/<name>.md. Read SKILL.md from
 "## Campaigns" if LOOP_NOTES has a campaign open. What this iteration found
 before the compaction is in state/scratch/iteration.txt; do not re-run
-state.sh.
+state.sh. If that file says a sweep is open, Read sweep.md beside SKILL.md and
+go on from `scripts/sweep.sh wait`.
