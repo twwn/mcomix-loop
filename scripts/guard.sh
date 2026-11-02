@@ -197,7 +197,7 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
     while [ $# -gt 0 ]; do
         t=$1; shift
         case "$t" in
-            -C) git_dir=${1:-}; case "$git_dir" in /*) ;; *) git_dir=$REPO/$git_dir ;; esac; shift ;;
+            -C) git_dir=${1:-}; case "$git_dir" in /*) ;; *) git_dir=${cwd:-$REPO}/$git_dir ;; esac; shift ;;
             -c|--git-dir|--work-tree|--namespace|--exec-path|--super-prefix) shift ;;  # global option with a value
             -*) ;;                                                                        # other global option
             *) sub=$t; break ;;
@@ -216,7 +216,7 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
             deny "git push: what leaves this machine is the user's decision." ;;
         commit)
             if [[ "$args" == *" --amend "* ]]; then
-                target=$REPO
+                target=${cwd:-$REPO}      # a subagent's worktree, not the checkout, for one started in it
                 [ -n "${git_dir:-}" ] && target=$git_dir
                 head=$(git -C "$target" rev-parse -q --verify HEAD 2>/dev/null)
                 amend_help="Fix a message the loop got wrong: its own unpushed newest commit with 'git commit --amend --only -F <file>'; any other with 'git notes append -F <file> <commit>'."
@@ -241,7 +241,7 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
             # Recorded before it runs: the parent it will sit on and the subject it
             # will have. That is how an amend later tells the loop's own commit
             # from one the user made by hand, whatever the commit printed.
-            ctarget=$REPO; [ -n "${git_dir:-}" ] && ctarget=$git_dir
+            ctarget=${cwd:-$REPO}; [ -n "${git_dir:-}" ] && ctarget=$git_dir
             if [[ "$args" == *" --amend "* ]]; then
                 cparent=$(git -C "$ctarget" rev-parse -q --verify "HEAD^" 2>/dev/null)
             else
