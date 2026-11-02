@@ -169,7 +169,7 @@ wait_reports() {
         done
         [ -n "$missing" ] || { echo "all in; $(reports_line)"; return 0; }
         [ "$(now)" -lt $((at + DEADLINE)) ] || { echo "deadline passed; $(reports_line)"; return 0; }
-        [ "$SECONDS" -lt "$slice" ] || { echo "waiting, call again; $(reports_line)"; return 0; }
+        [ "$SECONDS" -lt "$slice" ] || { echo "still waiting: run sweep.sh wait again now, and do not end the turn; $(reports_line)"; return 0; }
         sleep 5
     done
 }
