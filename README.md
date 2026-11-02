@@ -24,7 +24,7 @@ The loop runs unattended.
 - **Commits** – to the checkout `claude` was started in, on whatever branch is checked out. Only after the test suite, flake8 and mypy pass.
 - **Never** – pushes, stashes, stages a file it did not name, or rewrites history.
 - **One exception** – the message of its own newest commit, while no remote branch contains it. It uses `git commit --amend --only`, so the tree stays as it is. Any other wrong message gets a `git notes` note.
-- **Enforced** – a hook, `scripts/guard.sh`, refuses the forbidden commands. It acts only in the loop's session. Your other Claude Code sessions in the same checkout are unaffected. If the hook itself fails (missing, crashed, timed out), it refuses every command, and the loop stops.
+- **Enforced** – a hook, `scripts/guard.sh`, refuses the forbidden commands. It acts only in the loop's session and, with the settings snippet merged, in that session's subagents. Your other Claude Code sessions in the same checkout are unaffected. If the hook itself fails (missing, crashed, timed out), it refuses every command, and the loop stops.
 - **Runs** – the test suite under `xvfb-run`, and probes it writes itself. Each in the foreground, inside `timeout`.
 - **Writes** – to two places only: the checkout, and `state/` in the skill's directory.
 - **Posts to GitHub** – only what `config.sh` names. With `ISSUES_REPO`: issues and comments in that repository, and it closes the ones its commits finished. With `ISSUES_PROJECT`: that project's items and fields. What it posts is public, under your account. Unset, it writes nothing to GitHub.
@@ -93,6 +93,7 @@ Then:
    - `BASH_DEFAULT_TIMEOUT_MS` – the full gates take longer than the Bash tool's two-minute default.
    - `attribution.commit` – the commit trailer. Empty, so the loop's commits carry none. Yours to change.
    - `worktree.baseRef: head` – keeps subagent worktrees off `origin/master`.
+   - `hooks.PreToolUse` – the guard for the loop's subagents. A skill's own hooks do not fire inside a subagent, so without this one they run unguarded, and `state.sh` says so. It runs on every Bash, Monitor, Write and Edit call of every session. Outside the loop's subagents it exits at once, after a few milliseconds, and it does nothing if the skill is not installed.
 
 3. **Hide `.claude/` in the checkout:** `echo '.claude/' >> .git/info/exclude`. The campaign worktree and Claude Code's subagent worktrees live there. The loop reads an untracked path in `git status` as someone's work in progress.
 
@@ -112,7 +113,7 @@ cd <checkout> && claude
 
 At the first wakeup:
 
-- `/hooks` lists three session hooks.
+- `/hooks` lists three session hooks, and the subagent hook from your settings.
 - The first tool call is `state.sh`. Its first line names your checkout.
 - `/permissions` → Recently denied is empty.
 
@@ -130,9 +131,10 @@ At the second wakeup, `/context` shows the skill once, not twice.
 - **Exported trees** – `gates.sh --export` measures a clean `git archive`. Exports share one mypy cache, so mypy takes a second there, not half a minute.
 - **Worktrees** – `gates.sh --tree` keeps the logs of a tree other than the checkout in `state/scratch/logs/<tree>/`, so gates can run at once in two worktrees. Exports cannot: each new one removes the last.
 - **`guard.sh`** – PreToolUse hook. It enforces the never-rules. It notes each commit the loop makes, to know its own later.
+- **`subagent-guard.sh`** – PreToolUse hook from your settings. It runs `guard.sh` for the subagents of a loop session, which it knows by the mark `guard.sh` leaves in `state/scratch/sessions/`. In any other session it does nothing.
 - **`stop-check.sh`** – Stop hook. It keeps a turn going while the gates ran after the notes were last written, or while the bundle is broken. It counts only its own session's gate runs. It never holds back a session outside a checkout.
 - **Compaction hook** – SessionStart, on compaction. It prints `invariants.md`.
-- **Hooks are per session** – all three are registered only for the session that invoked the skill.
+- **Hooks are per session** – the three in `SKILL.md` are registered only for the session that invoked the skill.
 - **Hands off the skill** – the loop edits nothing in this directory except `state/`. Inside `state/` it never edits `config.sh` or `project.md`. The guard enforces both.
 
 ### The memory

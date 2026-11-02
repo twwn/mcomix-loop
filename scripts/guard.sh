@@ -12,6 +12,10 @@
 # a security boundary: it reads the command text, so `sh -c '...'` or a path
 # spelled through a variable can get past it.
 #
+# A skill's hook does not fire inside a subagent. subagent-guard.sh, a hook in
+# the user's settings, runs this script for the subagents of a session marked
+# below, with the same input.
+#
 # Self-test:
 #   printf '{"tool_name":"Bash","tool_input":{"command":"git stash"},"cwd":"<checkout>"}' | guard.sh; echo $?      # 2
 #   printf '{"tool_name":"Bash","tool_input":{"command":"git log -3"},"cwd":"<checkout>"}' | guard.sh; echo $?   # 0
@@ -29,21 +33,30 @@ has() { [[ "$1" =~ $2 ]]; }   # has <text> <extended regex>
 
 # The fields this guard reads, NUL-terminated: a command may hold newlines and tabs.
 if command -v jq >/dev/null 2>&1; then
-    fields() { jq -j '[.tool_name, .cwd, .tool_input.file_path, .tool_input.command, .tool_input.run_in_background]
+    fields() { jq -j '[.tool_name, .cwd, .tool_input.file_path, .tool_input.command, .tool_input.run_in_background, .session_id]
                       | map((. // "" | tostring) + "\u0000") | add' 2>/dev/null; }
 else
     fields() { python3 -S -c 'import json, sys
 d = json.load(sys.stdin)
 t = d.get("tool_input") or {}
-v = [d.get("tool_name"), d.get("cwd"), t.get("file_path"), t.get("command"), t.get("run_in_background")]
+v = [d.get("tool_name"), d.get("cwd"), t.get("file_path"), t.get("command"), t.get("run_in_background"), d.get("session_id")]
 sys.stdout.write("".join(("true" if x is True else "" if x in (None, False) else str(x)) + "\0" for x in v))' 2>/dev/null; }
 fi
 { IFS= read -r -d '' tool; IFS= read -r -d '' cwd; IFS= read -r -d '' path
-  IFS= read -r -d '' cmd; IFS= read -r -d '' bg; } < <(fields)
+  IFS= read -r -d '' cmd; IFS= read -r -d '' bg; IFS= read -r -d '' session; } < <(fields)
 
 REPO=$(resolve_repo "${cwd:-}") \
     || deny "this session's working directory is not an MComix checkout (mcomix/, test/, mcomix/constants.py); the loop only runs from inside one. Start claude there. To work on the skill itself, start a session without /mcomix-loop."
 CAMPAIGN=$REPO/.claude/worktrees/campaign
+
+# Only the loop's session runs this hook in its main thread, so every call
+# leaves that session's mark: subagent-guard.sh guards its subagents by it.
+# Written again whenever the scratch directory has been cleared.
+case "$session" in
+    ""|*/*) ;;
+    *) [ -e "$SESSIONS/$session" ] || { mkdir -p "$SESSIONS" && : > "$SESSIONS/$session"; } 2>/dev/null \
+           || deny "cannot write $SESSIONS/$session, without which this session's subagents would run unguarded." ;;
+esac
 
 # ---------------------------------------------------------------- file tools
 case "$tool" in

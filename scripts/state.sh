@@ -156,3 +156,8 @@ echo "== protocol =="
 echo "Before a lead: grep -rn its file and function in $REJECTED. A ruling from the user: record it with okf.py ruling, in their words, then act."
 echo "End: rewrite LOOP_NOTES, add to LOOP_TECHNIQUES/REJECTED, delete iteration.txt, report, ScheduleWakeup last (60 s; up to 900 while only a CI run is awaited; stop only for 3 quiet / unfixable gate / user's decision, with PushNotification)."
 echo "Never: stash, push, add -A, background commands, suite/probe/mypy without timeout; amend only your own unpushed tip, message only. Findings as they arrive -> $SCRATCH/iteration.txt."
+# A skill's hook does not fire inside a subagent; subagent-guard.sh, from the
+# settings, is what guards one. This reads only whether the settings name it: a
+# session started before the merge may not have the hook yet.
+grep -qsF subagent-guard.sh "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" "$REPO/.claude/settings.json" "$REPO/.claude/settings.local.json" \
+    || echo "Subagents run without the guard: the hook in settings-snippet.json is not in the settings. A subagent only reads until it is; ask the user to merge it, under Questions for the user."

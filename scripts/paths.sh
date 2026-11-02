@@ -12,6 +12,7 @@
 #   REJECTED   $STATE/rejected.md      what was examined and left alone
 #   COMMITS    $STATE/commits.log      parent and subject of each commit the loop made (guard.sh)
 #   SCRATCH    $STATE/scratch          gate logs, exports, iteration.txt; not part of the bundle
+#   SESSIONS   $SCRATCH/sessions       one empty file per session the guard has run in (subagent-guard.sh)
 #   CAMPAIGN  $REPO/.claude/worktrees/campaign — inside the project directory,
 #             next to where the harness puts subagent worktrees, so no extra
 #             permission scope is needed; .claude/ must be in .git/info/exclude.
@@ -33,6 +34,7 @@ DECISIONS=$STATE/decisions
 REJECTED=$STATE/rejected.md
 COMMITS=$STATE/commits.log
 SCRATCH=$STATE/scratch
+SESSIONS=$SCRATCH/sessions
 OKF="python3 -S $SKILL_DIR/scripts/okf.py"   # -S: stdlib only, and site's start-up is two thirds of its run
 
 # Per-installation settings, overridable in $STATE/config.sh (seeded from
