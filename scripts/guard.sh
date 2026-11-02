@@ -33,17 +33,18 @@ has() { [[ "$1" =~ $2 ]]; }   # has <text> <extended regex>
 
 # The fields this guard reads, NUL-terminated: a command may hold newlines and tabs.
 if command -v jq >/dev/null 2>&1; then
-    fields() { jq -j '[.tool_name, .cwd, .tool_input.file_path, .tool_input.command, .tool_input.run_in_background, .session_id]
+    fields() { jq -j '[.tool_name, .cwd, .tool_input.file_path, .tool_input.command, .tool_input.run_in_background, .session_id, .agent_id]
                       | map((. // "" | tostring) + "\u0000") | add' 2>/dev/null; }
 else
     fields() { python3 -S -c 'import json, sys
 d = json.load(sys.stdin)
 t = d.get("tool_input") or {}
-v = [d.get("tool_name"), d.get("cwd"), t.get("file_path"), t.get("command"), t.get("run_in_background"), d.get("session_id")]
+v = [d.get("tool_name"), d.get("cwd"), t.get("file_path"), t.get("command"), t.get("run_in_background"), d.get("session_id"), d.get("agent_id")]
 sys.stdout.write("".join(("true" if x is True else "" if x in (None, False) else str(x)) + "\0" for x in v))' 2>/dev/null; }
 fi
 { IFS= read -r -d '' tool; IFS= read -r -d '' cwd; IFS= read -r -d '' path
-  IFS= read -r -d '' cmd; IFS= read -r -d '' bg; IFS= read -r -d '' session; } < <(fields)
+  IFS= read -r -d '' cmd; IFS= read -r -d '' bg; IFS= read -r -d '' session
+  IFS= read -r -d '' agent; } < <(fields)
 
 REPO=$(resolve_repo "${cwd:-}") \
     || deny "this session's working directory is not an MComix checkout (mcomix/, test/, mcomix/constants.py); the loop only runs from inside one. Start claude there. To work on the skill itself, start a session without /mcomix-loop."
@@ -67,6 +68,12 @@ esac
 # ---------------------------------------------------------------- file tools
 case "$tool" in
     Write|Edit)
+        if [ -n "$agent" ]; then
+            case "$path" in
+                "$SCRATCH"/*) ;;
+                "$STATE"/*) deny "a subagent writes nothing in the bundle: it reports to the main thread, which keeps what it finds. Its own files go under $SCRATCH." ;;
+            esac
+        fi
         case "$path" in
             "$STATE"/index.md|"$TECHNIQUES"/index.md|"$DECISIONS"/index.md)
                 deny "index.md is generated from the concepts' frontmatter (okf.py index, run by state.sh); edit the concept instead." ;;
@@ -398,6 +405,7 @@ check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; of what reach
 check_gh_issue() {   # $1: create|edit|comment|close|reopen, then its arguments
     local act=$1 t v r named=""
     shift
+    [ -z "$agent" ] || deny "gh issue $act: what the loop posts is public, and goes through the main thread. Report it there."
     [ -n "$ISSUES_REPO" ] \
         || deny "gh issue $act: $STATE/config.sh names no ISSUES_REPO, so issues are the user's. Prepare the commands for the user under 'Questions for the user'."
     while [ $# -gt 0 ]; do
@@ -431,6 +439,7 @@ check_gh_issue() {   # $1: create|edit|comment|close|reopen, then its arguments
 check_gh_project() {   # $1: item-add|item-edit|field-create, then its arguments
     local act=$1 t v named="" owner=${ISSUES_PROJECT%/*} number=${ISSUES_PROJECT##*/}
     shift
+    [ -z "$agent" ] || deny "gh project $act: what the loop posts is public, and goes through the main thread. Report it there."
     [ -n "$ISSUES_PROJECT" ] \
         || deny "gh project $act: $STATE/config.sh names no ISSUES_PROJECT, so projects are the user's. Prepare the commands for the user under 'Questions for the user'."
     case " $* " in
@@ -453,6 +462,32 @@ check_gh_project() {   # $1: item-add|item-edit|field-create, then its arguments
     [ -n "$named" ] || deny "gh project $act: name the owner, as 'gh project $act $number --owner $owner'."
 }
 
+# The bundle is the main thread's: a subagent reports to it and writes under
+# SCRATCH. This reads the command text, so it catches the
+# slip, not a determined way round.
+check_subagent() {   # $1: one segment of a subagent's command
+    local rest=${1//[\"\']/}
+    case " $rest " in
+        *okf.py*" ruling "*|*okf.py*" verified "*|*okf.py*" index "*)
+            deny "the bundle is the main thread's: report the ruling or the check to it." ;;
+    esac
+    # shellcheck disable=SC2206
+    local t=($rest)
+    case "${t[0]:-}" in
+        cp|install|*/cp|*/install)
+            case "${t[${#t[@]}-1]}" in
+                "$SCRATCH"/*) ;;
+                "$STATE"/*) deny "a subagent writes nothing in the bundle: it reports to the main thread. Its own files go under $SCRATCH." ;;
+            esac ;;
+    esac
+    rest=${rest//"$SCRATCH/"/}
+    [[ "$rest" == *"$STATE/"* ]] || return 0
+    if has "$rest" ">[[:space:]]*$STATE/|(^|[[:space:]])(tee|truncate|rm|mv)[[:space:]][^|;&]*$STATE/|(^|[[:space:]])(sed|perl)[[:space:]]+-[A-Za-z]*i[^|;&]*$STATE/"; then
+        deny "a subagent writes nothing in the bundle: it reports to the main thread. Its own files go under $SCRATCH."
+    fi
+    return 0
+}
+
 # Split on command separators and substitutions; inspect every segment.
 nl=$'\n'
 split=${flat//&&/$nl}; split=${split//||/$nl}; split=${split//;/$nl}; split=${split//|/$nl}
@@ -467,6 +502,7 @@ for seg in "${segs[@]}"; do
     toks=(${seg//[\"\']/})
     [ ${#toks[@]} -eq 0 ] && continue
 
+    [ -n "$agent" ] && check_subagent "$seg"
     [[ "$seg" == *"$REJECTED"* ]] && check_appendonly "$seg" "$REJECTED"
     if [[ "$seg" == *"$TECHNIQUES/"* ]]; then
         if has "$seg" "$TECHNIQUES/[A-Za-z0-9_.-]+\.md"; then
