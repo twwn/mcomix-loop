@@ -54,14 +54,21 @@ as it is.
   after one means a file it depends on changed since it was last written
   or verified - re-check what you rely on before quoting it.
 - `DECISIONS` = `STATE/decisions/`, one `type: Ruling` file each: the
-  user's rulings in their words, tagged `program` or `installation`,
-  injected at the end of this file. Record one the moment it is given, and
-  only so: `python3 ${CLAUDE_SKILL_DIR}/scripts/okf.py ruling --tag <tag>
-  --title "<short>" --text '"<their words>" - <what it means>'`. Never
-  edited: a changed ruling is a new one naming the date it replaces; the
-  newest wins. Rulings only (a request once done counts: it stops a later
-  iteration "fixing" it back), not events. `(unconfirmed)` marks one the
-  user has not confirmed yet (`okf.py confirm` is theirs): follow it, but
+  user's rulings in their words, injected at the end of this file. A ruling
+  is what still binds a later iteration: what one would otherwise "fix" back
+  or ask again. A request its commit finishes, a go-ahead, an order of work
+  and the state of one release or campaign are not rulings: they go in the
+  commit message or `LOOP_NOTES`. Record one the moment it is given, and only
+  so: `python3 ${CLAUDE_SKILL_DIR}/scripts/okf.py ruling --tag <tag> --title
+  "<the rule>" --text '"<their words>" - <the rule>'`. The title and the rule
+  stand alone for a reader who never saw the conversation: they say in words
+  what holds, with no `SCRATCH` path or item number, and with no hash in place
+  of the behaviour. Tag `program` for what MComix does, which is all a sweep's
+  auditors see, and `installation` for how the loop and the project work. Never
+  edited: when the user's words change a ruling, the new one takes `--replaces
+  <its file name>`, which keeps the old file and takes it out of this prompt.
+  Where two in force still disagree, the newest wins. `(unconfirmed)` marks one
+  the user has not confirmed yet (`okf.py confirm` is theirs): follow it, but
   when the tree or the user disagrees with it, ask rather than act on it.
 - `REJECTED` = `STATE/rejected.md` (`type: Rejection Register`) — what was
   examined and deliberately left alone, one line each beginning with where

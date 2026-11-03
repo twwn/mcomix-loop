@@ -156,7 +156,7 @@ The `index.md` files are generated.
 | `notes.md` | Iteration Notes | Gate numbers, open campaign, questions, the last claim, leads | Rewritten every iteration | In full, every iteration |
 | `techniques/*.md` | Technique | How to measure and test this code base. One topic each, with the source files it depends on | Added to, corrected in place with Edit, never deleted | Names every iteration, flagged when a source changed. Files on demand |
 | `rejected.md` | Rejection Register | What was examined and left alone, and why | Added to, corrected in place with Edit | By `grep`, before each lead |
-| `decisions/*.md` | Ruling | Your rulings in your words, tagged `program` or `installation` | By `okf.py ruling`, never edited. Confirmed by you | One line each, in the prompt. Unconfirmed ones marked |
+| `decisions/*.md` | Ruling | Your rulings in your words, tagged `program` or `installation` | By `okf.py ruling`, never edited. Confirmed by you | One line each, in the prompt. Unconfirmed ones marked, replaced ones left out |
 | `project.md` | Installation | The facts of your installation | By you | In full, in the prompt |
 
 `reference.md` holds the task list and the facts of the code base.

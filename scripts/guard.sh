@@ -82,7 +82,7 @@ case "$tool" in
                 [ "$tool" = Write ] && [ -e "$path" ] \
                     && deny "${path##*/} exists: add to it or correct it in place with Edit; never overwrite a concept. A new technique is a new file." ;;
             "$DECISIONS"/*)
-                deny "a ruling is recorded with okf.py ruling (a new file) and never edited: a changed ruling is a new one naming the date of the one it replaces." ;;
+                deny "a ruling is recorded with okf.py ruling (a new file) and never edited: a changed ruling is a new one, with --replaces <the old one's file name>." ;;
             "$STATE"/config.sh|"$STATE"/project.md|"$COMMITS")
                 deny "$path is the user's: settings and installation facts. Record what is wrong under 'Prompt corrections' in LOOP_NOTES." ;;
             "$STATE"/*) ;;

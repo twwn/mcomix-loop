@@ -18,13 +18,15 @@ A source written `repo:<path>` is a file in the MComix checkout.
                        source file changed after the concept was last written
                        or verified, [source gone] where one no longer exists
     okf.py stale       the same, with the files that changed
-    okf.py rulings     the rulings, one line each, for the prompt
+    okf.py rulings     the rulings in force, one line each, for the prompt
     okf.py index       (re)write the index.md files
     okf.py check       conformance; exit 1 and name each problem
     okf.py state       what state.sh shows of the bundle, in one start-up:
                        index, list, the probes named but missing, problems
     okf.py ruling --tag program|installation --title T --text T [--by ACTOR]
-                       record a ruling (a new file; rulings are never edited)
+                  [--replaces <ruling file>...]
+                       record a ruling (a new file; rulings are never edited).
+                       One it replaces keeps its file and leaves the prompt
     okf.py verified <technique>...   the loop re-checked these (machine tier)
     okf.py confirm --as <id> <ruling>...   the user confirms (human tier);
                        the guard refuses this one inside the loop session
@@ -250,13 +252,19 @@ def cmd_stale(state):
         print(f'{slug}: ' + ', '.join([f'{p} changed' for p in changed] + [f'{p} gone' for p in gone]))
 
 
+def replaced_rulings(items):
+    return {str(s) for c in items for s in c[2].get('replaces') or []}
+
+
 def cmd_rulings(state):
     items = concepts(state, 'decisions')
     if not items:
         print('(no rulings recorded)')
         return
+    replaced = replaced_rulings(items)
+    in_force = [c for c in items if c[0] not in replaced]
     for tag, heading in RULING_TAGS:
-        group = [c for c in items if tag in (c[2].get('tags') or [])]
+        group = [c for c in in_force if tag in (c[2].get('tags') or [])]
         if not group:
             continue
         print(f'{heading}:')
@@ -265,6 +273,8 @@ def cmd_rulings(state):
             date = slug[:10] if re.match(r'\d{4}-\d{2}-\d{2}', slug) else ''
             flag = '' if human_confirmed(fm) else ' (unconfirmed)'
             print(f'- {date + ": " if date else ""}{text}{flag}')
+    if len(in_force) < len(items):
+        print(f'({len(items) - len(in_force)} replaced rulings are not shown; their files stay in decisions/.)')
 
 
 def cmd_index(state, quiet=False):
@@ -286,12 +296,14 @@ def cmd_index(state, quiet=False):
     if tech:
         write(os.path.join(state, 'techniques', 'index.md'), '\n'.join(lines).rstrip() + '\n')
     lines = ['# Rulings', '']
+    replaced = replaced_rulings(rul)
     for tag, heading in RULING_TAGS:
         group = [c for c in rul if tag in (c[2].get('tags') or [])]
         if group:
             lines += [f'## {heading}', '']
             lines += [f'* [{c[2].get("title", c[0])}]({c[0]}.md) - '
-                      f'{"confirmed" if human_confirmed(c[2]) else "unconfirmed"}' for c in group] + ['']
+                      f'{"confirmed" if human_confirmed(c[2]) else "unconfirmed"}'
+                      f'{", replaced" if c[0] in replaced else ""}' for c in group] + ['']
     if rul:
         write(os.path.join(state, 'decisions', 'index.md'), '\n'.join(lines).rstrip() + '\n')
     root = ['---', 'okf_version: "0.2"', '---', '', '# MComix loop knowledge', '',
@@ -395,15 +407,23 @@ def cmd_ruling(state, args):
     ap.add_argument('--title', required=True)
     ap.add_argument('--text', required=True, help='the user\'s words in quotes, then what they mean')
     ap.add_argument('--by', default=LOOP_ACTOR)
+    ap.add_argument('--replaces', nargs='+', default=[], metavar='FILE',
+                    help='the file name of each ruling this one changes')
     a = ap.parse_args(args)
     d = os.path.join(state, 'decisions')
     os.makedirs(d, exist_ok=True)
+    replaces = [os.path.basename(r).removesuffix('.md') for r in a.replaces]
+    for r in replaces:
+        if r == 'index' or not os.path.exists(os.path.join(d, r + '.md')):
+            sys.exit(f'okf.py ruling --replaces: no ruling named {r} in {d}')
     stamp = now_iso()
     base = f'{stamp[:10]}-{_slug(a.title)}'
     path, n = os.path.join(d, base + '.md'), 2
     while os.path.exists(path):
         path, n = os.path.join(d, f'{base}-{n}.md'), n + 1
     fm = {'type': 'Ruling', 'title': a.title, 'tags': [a.tag], 'generated': {'by': a.by, 'at': stamp}}
+    if replaces:
+        fm['replaces'] = replaces
     with open(path, 'x', encoding='utf-8') as f:
         f.write(dump(fm) + '\n' + ' '.join(a.text.split()) + '\n')
     cmd_index(state, quiet=True)
