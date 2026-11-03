@@ -1,0 +1,16 @@
+---
+type: Technique
+title: "Thread counts: one machine measured as several (taskset), and what a worker process costs (PSS)"
+tags: [code]
+sources:
+  - { resource: "repo:mcomix/tools.py" }
+  - { resource: "repo:mcomix/archive/native_pdf/manager.py" }
+  - { resource: "repo:mcomix/archive/native_pdf/parent.py" }
+generated: { by: mcomix-loop/claude-opus-5-5, at: "2026-10-04T13:13:36Z" }
+---
+
+- **A count "not tuned on one machine" is tested by making this machine several.** `taskset -c <set> python3 <bench>` limits the process to those CPUs, and `os.process_cpu_count()` (so `tools.thread_count(0)`) follows the affinity. This box is an i7-13700K: CPUs 0-15 are 8 P-cores with SMT (pairs 0/1, 2/3, ...), 16-23 are E-cores (`lscpu -e=CPU,CORE,MAXMHZ`). Sets used at 4052148a: `0,2,4,6` (4 cores), `0,2,...,14` (8 cores), `0-15`, `0-23`. If the best count moves with the set, it follows the processors; if it stays put, it is a property of the work.
+- **Benchmarks:** `STATE/probes/extract_threads_bench.py <workdir>` with `ONLY=zip,7z,pdf THREADS=1,2,4,8,...` (0 = the automatic setting) drives the real Extractor; put the workdir on tmpfs (scratchpad), as /tmp is where MComix extracts. It builds its pages and archives once; a PDF of drawn pages has to be made separately (pymupdf `new_shape().draw_bezier`, 300 curves a page, 24 pages; 1500 curves a page at 288 dpi took 1.3 s a page) and put in a second workdir as `pdf.pdf`, with the first workdir's other files symlinked in. `STATE/probes/thumb_threads_taskset.py <dir> 1,2,4,...` (EXT=jpg|png) times thumbnails; inputs were scratch/thumbbench (60 JPEG 1200x1800, 30 PNG 1800x2700, each x4).
+- **Results at 4052148a, best of three** (full table in the 4052148a commit message): PNG thumbnails and 7z (an outside program) were fastest at one thread per CPU on every set; ZIP levels off near 8 and loses at most 0.02 s beyond; small JPEG thumbnails, GIL-bound, are fastest at 4-6 on every set and collapse (66 to 158 ms for 240) only when threads spill onto the E-cores. PDF of embedded JPEGs: best 2-8; PDF of drawn pages: best near the CPU count. So no single count fits PDFs, and what is machine-independent is the cost of a worker.
+- **What a worker process costs: PSS, not RSS.** `STATE/probes/pdf_worker_pss.py <pdf> <outdir> <n>` starts n FitzProcessWranglers on threads, walks the process's descendants through `/proc/*/stat` (the manager is a grandchild, under the forkserver) and sums `Pss:` from `/proc/<pid>/smaps_rollup`. RSS double-counts the forkserver's shared pages (167 MB against 125 MB PSS a worker). Importing pymupdf plus mcomix' child alone is 134 MB PSS in a fresh process, so limiting MuPDF's store (`pymupdf.TOOLS.store_maxsize` is a function, not a settable value) would not help.
+- **Traps.** A probe using `multiprocessing` with spawn or forkserver needs `if __name__ == '__main__'`, or the child re-runs it. The forkserver and resource tracker outlive a killed parent and keep a pipe open, so `timeout ... | tail` hangs past the timeout; kill them (`pkill -f "[m]ultiprocessing.(forkserver|resource_tracker)"`, the bracket keeps pkill from matching its own shell, which an unbracketed pattern did, exit 144) and never pipe a forkserver probe, write to a file and grep it.

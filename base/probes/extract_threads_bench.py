@@ -105,7 +105,7 @@ def main():
             continue
         row = []
         handler = ''
-        for threads in (1, 2, 4, 8):
+        for threads in [int(t) for t in os.environ.get("THREADS", "1,2,4,8").split(",")]:
             runs = [unpack(path, threads) for _run in range(3)]
             best = min(took for took, _handler in runs)
             handler = runs[0][1]
