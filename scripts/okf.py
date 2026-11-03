@@ -470,7 +470,7 @@ def main(argv):
     elif cmd == 'confirm':
         if len(argv) < 5 or argv[2] != '--as':
             sys.exit('usage: okf.py confirm --as <your id> <ruling file>...')
-        _add_verification(argv[4:], f'human:{argv[3]}')
+        _add_verification([p for p in argv[4:] if os.path.basename(p) != 'index.md'], f'human:{argv[3]}')
         cmd_index(state, quiet=True)
     else:
         print(__doc__.strip())
