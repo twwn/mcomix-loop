@@ -55,6 +55,7 @@ SWEEP_EVERY=25     # commits under mcomix/ or docs/ before a lens that found not
 SWEEP_WIDTH=5      # auditors at once
 SWEEP_MODEL=sonnet # the model and effort of an auditor, unless the sweep names another for its lens
 SWEEP_EFFORT=high
+SWEEP_FEATURES=0   # 1: a sweep may also look for what MComix lacks (the feature lenses in sweep.md)
 # shellcheck disable=SC1091
 [ -r "$STATE/config.sh" ] && . "$STATE/config.sh"
 
