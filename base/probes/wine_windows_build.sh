@@ -8,7 +8,7 @@ set -eu
 W=$(realpath "$1"); mkdir -p "$W"
 HERE=$(dirname "$(realpath "$0")")
 export WINEPREFIX="$W/wineprefix" WINEDEBUG=-all GSK_RENDERER=cairo
-PKGS="gtk4 adwaita-icon-theme libadwaita libjxl python python-gobject python-pillow python-pip python-pymupdf pyinstaller"
+PKGS="gtk4 adwaita-icon-theme jxrlib libadwaita libjxl python python-gobject python-pillow python-pip python-pymupdf pyinstaller"
 if [ ! -d "$W/msys/root/ucrt64" ]; then
   mkdir -p "$W/msys/pkgs" "$W/msys/root"
   curl -sfL -o "$W/msys/ucrt64.db" https://repo.msys2.org/mingw/ucrt64/ucrt64.db
