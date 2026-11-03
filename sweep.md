@@ -121,9 +121,9 @@ user would expect both: the reader and the library (cover menu, keys, what a
 selection means), the menu entry, tool bar button and key for one action, one
 page and two, manga order and not, a folder book and an archive, each archive
 format, two dialogs that show one setting. Options defined and never read;
-actions nothing can reach. Compare the two lists mechanically where you can. A
-difference a ruling decides is no lead, and one that would change what MComix is
-says so.
+actions nothing can reach. Compare the two lists mechanically where you can: a
+key table read against its twins found the keypad's keys missing. A difference a
+ruling decides is no lead, and one that would change what MComix is says so.
 
 Read first: `actions-nothing-can-reach-menus-tool-bar-keys.md`, `changing-the-pages-of-the-open-book.md`, `adding-a-keyboard-action.md`, `private-names-and-dead-code-ast-sweeps.md`.
 
@@ -132,12 +132,14 @@ Read first: `actions-nothing-can-reach-menus-tool-bar-keys.md`, `changing-the-pa
 What comes from outside the program and is not what the code assumes, seen from
 where the reader sits: names and text from other systems, a damaged or odd
 archive or image, a file system that refuses (read-only, full, the file gone or
-replaced meanwhile). An operation the user asked for and is watching that fails
-with a log line and nothing on screen. Anything lost because a step after the
-point of no return failed. The fuzz targets cover the parsers' crashes, so look
-at what the reader gets, not at whether they crash.
+replaced meanwhile). A real process shows what a test inside one cannot: with its
+config directory read-only, one stayed alive after it was told to quit. An
+operation the user asked for and is watching that fails with a log line and
+nothing on screen. Anything lost because a step after the point of no return
+failed. The fuzz targets cover the parsers' crashes, so look at what the reader
+gets, not at whether they crash.
 
-Read first: `names-and-text-from-other-systems-zip-names.md`, `file-uris-and-content-types-glib-s-never-urllib.md`, `encrypted-archives-nothing-asks-on-the-reader-s.md`, `text-a-reader-typed-used-as-a-pattern.md`, `forward-compatible-stores-what-an-older-mcomix.md`.
+Read first: `names-and-text-from-other-systems-zip-names.md`, `file-uris-and-content-types-glib-s-never-urllib.md`, `encrypted-archives-nothing-asks-on-the-reader-s.md`, `text-a-reader-typed-used-as-a-pattern.md`, `forward-compatible-stores-what-an-older-mcomix.md`, `gio-trash-refuses-bind-mounts-and-tmpfs.md`, `rar-archives-a-test-builds-by-hand.md`.
 
 ### threads
 
@@ -148,7 +150,7 @@ callback that assumes the state it was queued under. Turning pages fast and
 closing a book while thumbnails load are ordinary speed; a race only a debugger
 could produce is not.
 
-Read first: `threads-that-share-one-thing.md`, `which-thread-reaches-something-across-the-whole.md`, `check-then-act-on-the-file-system-and-code.md`, `a-worker-that-aborts-inside-gtk.md`, `flakes-make-the-rare-case-common.md`.
+Read first: `threads-that-share-one-thing.md`, `which-thread-reaches-something-across-the-whole.md`, `check-then-act-on-the-file-system-and-code.md`, `a-worker-that-aborts-inside-gtk.md`, `flakes-make-the-rare-case-common.md`, `a-slow-cover-how-to-build-one-and-time-the-wait.md`, `counting-redraws-over-a-pump-late-pages-and-resizes.md`.
 
 ### lifetime
 
@@ -156,7 +158,8 @@ State that outlives what owns it: signal handlers, `GLib.timeout_add` and
 `idle_add` sources, listeners on long-lived objects, dialogs and popovers that
 fire or stay after their window, book or library entry has gone. What does each
 long-lived object still hold after a book is closed, or a second window is opened
-and closed? What happens when the book moves, or goes, while it is open?
+and closed? What happens when the book moves, or goes, while it is open? While a
+prompt is up, what still happens behind it?
 
 Read first: `listeners-that-outlive-what-they-belong-to.md`, `dialogs-and-widgets-that-outlive-their-window.md`, `gtk-reference-counts-from-python.md`, `every-way-a-book-is-left-and-the-question-about.md`, `what-follows-a-book-that-moves-or-goes.md`.
 
@@ -167,9 +170,11 @@ it sets itself (`set_active()` from code emits `toggled`; `close()` emits
 `close-request` before it returns); a page number counted from one used where an
 index counted from zero is meant, or the reverse; an event controller on the
 wrong widget or in the wrong phase; what works by key and not by pointer; focus,
-selection and mnemonics. Real events under Xvfb show what a call does not.
+selection and mnemonics. Real events under Xvfb show what a call does not, above
+all on the parts of a dialog no test clicks: a test that calls the handler at
+(0, 0) cannot see which part was clicked.
 
-Read first: `checking-what-the-port-changed.md`, `pygobject-introspection-traps.md`, `a-real-click-drag-or-key-under-xvfb-xdotool.md`, `a-click-into-an-unfocused-window-focus-first.md`, `a-gtk-entry-in-a-dialog-selects-all-of-itself.md`.
+Read first: `checking-what-the-port-changed.md`, `pygobject-introspection-traps.md`, `a-real-click-drag-or-key-under-xvfb-xdotool.md`, `a-click-into-an-unfocused-window-focus-first.md`, `a-gtk-entry-in-a-dialog-selects-all-of-itself.md`, `hidpi-gdk-scale-under-xvfb.md`, `a-wayland-compositor-for-a-probe-headless-sway.md`.
 
 ### docs
 
@@ -180,7 +185,7 @@ the code or by running it. `test_wiki.py`, `test_keybindings.py` and
 they do not. Wrong and missing, not style: the brevity ruling applies to any
 wording you propose.
 
-Read first: `documentation-where-it-lives-and-what-checks-it.md`.
+Read first: `documentation-where-it-lives-and-what-checks-it.md`, `package-channels-what-each-accepts-and-which-credential.md`.
 
 ### windows
 
@@ -190,4 +195,4 @@ by case, a console window per subprocess, branches on the platform that no test
 here runs. Under Wine a probe is slow, so a chain of file:line that names the call
 and what Windows does with it may stand as `unproven`.
 
-Read first: `windows-what-the-tests-must-not-assume.md`, `windows-refuses-to-move-or-replace-an-open-file.md`, `the-windows-branches-of-portability-py-run-on.md`, `the-test-suite-under-wine.md`.
+Read first: `windows-what-the-tests-must-not-assume.md`, `windows-refuses-to-move-or-replace-an-open-file.md`, `the-windows-branches-of-portability-py-run-on.md`, `the-test-suite-under-wine.md`, `window-states-under-wine-fullscreen-maximize-and-when.md`.
