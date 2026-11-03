@@ -34,6 +34,7 @@ The loop runs unattended.
 - **Uses `auto` permission mode** – a permission prompt would stall a loop nobody watches. Claude Code's classifier still reviews every command but one: closing an issue in your repository, which the settings snippet allows.
 - **May open a git worktree** – at `<checkout>/.claude/worktrees/campaign`, for a change too large for one commit. Only for a campaign you approved.
 - **May start subagents** – when no lead can be worked, up to five auditors, each in a worktree of its own under `<checkout>/.claude/worktrees/`. They change nothing in the checkout, commit nothing and post nothing, and the guard holds them to it. Each costs a subagent's tokens, so a sweep costs about what several iterations do. It needs the guard's hook in your settings. `SWEEP_EVERY=0` in `config.sh` turns sweeps off.
+- **May look for features** – only with `SWEEP_FEATURES=1`. One subagent of a sweep is then a scout, which looks for what MComix lacks and reads other programs' manuals and trackers on the web. What it proposes is built only if one of your rulings gives new features to the loop. Otherwise it waits in the notes as a question. Off by default.
 
 If that is more than you want an unattended process to do, do not install it.
 
@@ -78,7 +79,7 @@ Then:
 
    Three parts describe one installation. Adapt them:
 
-   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12, or 3.13 before 3.13.6, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once; `SWEEP_MODEL` and `SWEEP_EFFORT` what they run at (Sonnet, high), which the loop may change for one lens of a sweep, up to Opus, high.
+   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12, or 3.13 before 3.13.6, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once; `SWEEP_MODEL` and `SWEEP_EFFORT` what they run at (Sonnet, high), which the loop may change for one lens of a sweep, up to Opus, high; `SWEEP_FEATURES=1` lets a sweep look for what MComix lacks.
    - `project.md` – replace the author's facts with yours: where your fork stands, how you release, which campaigns are finished.
    - `decisions/` – the author's rulings, one file each. Keep those tagged `program` if you build on this fork: they say why the program behaves as it does. Delete those tagged `installation`. Confirm the ones you keep: `python3 scripts/okf.py confirm --as <you> state/decisions/*.md`.
 
@@ -132,7 +133,7 @@ At the second wakeup, `/context` shows the skill once, not twice.
 
 - **`SKILL.md`** – the protocol. Its body is static, so it costs its tokens once per session and once after each compaction.
 - **`scripts/state.sh`** – the first command of every iteration. It prints the checkout and its branch, the tree, the commits since the notes' baseline, the issues and discussions on GitHub, the notes and the names of the techniques.
-- **`sweep.md`, `scripts/sweep.sh`** – the sweep: how the loop runs one, what an auditor is told, and the lenses. Read only when a sweep is due. Each lens's result and tier go into `state/sweeps.log`. A lens runs until it finds nothing, then rests until enough commits have come.
+- **`sweep.md`, `scripts/sweep.sh`** – the sweep: how the loop runs one, what an auditor is told, and the lenses. Read only when a sweep is due. Each lens's result and tier go into `state/sweeps.log`. A lens runs until it finds nothing, then rests until enough commits have come. A feature lens rests after every run, and a sweep takes at most one, so that it cannot keep the loop going by itself.
 - **`scripts/gates.sh`** – runs the suite, then flake8 beside mypy, each with a hard timeout. It prints one line per gate.
 - **Exported trees** – `gates.sh --export` measures a clean `git archive`. Exports share one mypy cache, so mypy takes a second there, not half a minute.
 - **Worktrees** – `gates.sh --tree` keeps the logs of a tree other than the checkout in `state/scratch/logs/<tree>/`, so gates can run at once in two worktrees. Exports cannot: each new one removes the last.

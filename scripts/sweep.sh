@@ -25,6 +25,11 @@
 # A lens runs at SWEEP_MODEL and SWEEP_EFFORT unless `start` names another tier
 # for it. The loop picks unattended, so what it may name stops at opus/high; only
 # config.sh goes higher. `done` adds the tier to the lens's line in sweeps.log.
+#
+# With SWEEP_FEATURES=1 the feature lenses in sweep.md join them, under a brief
+# of their own. A sweep takes at most one unless it is named, and one rests after
+# every run that reported, whatever it left: such a lens nearly always finds
+# something, and that must not keep the loop going.
 
 set -u
 case "$0" in */*) . "${0%/*}/paths.sh" ;; *) . ./paths.sh ;; esac
@@ -37,7 +42,6 @@ DEADLINE=3600     # seconds an auditor has; a past one took 22 minutes over more
 
 die() { echo "sweep: $1" >&2; exit 2; }
 now() { printf '%(%s)T' -1; }
-lenses() { sed -n 's/^### //p' "$DOC"; }
 
 # The lines under a heading, up to the next heading of its level or above.
 section() {   # section <heading line> <file>
@@ -46,6 +50,12 @@ section() {   # section <heading line> <file>
         on && /^#+ / && index($0, " ") <= n { exit }
         on' "$2"
 }
+
+audit_lenses() { section "## The lenses" "$DOC" | sed -n 's/^### //p'; }
+feature_lenses() { [ "$SWEEP_FEATURES" != 1 ] || section "## The feature lenses" "$DOC" | sed -n 's/^### //p'; }
+lenses() { audit_lenses; feature_lenses; }
+FEATURES=" $(feature_lenses | tr '\n' ' ')"
+is_feature() { [[ "$FEATURES" == *" $1 "* ]]; }
 
 # One tab-separated line per lens, in sweep.md's order: lens, last run (0 for
 # never), its commit, what survived, commits since.
@@ -66,18 +76,29 @@ lens_table() {
 # due <array name for the lenses due> <array name for lines about those resting>
 sort_lenses() {
     local -n due_out=$1 rest_out=$2
-    local lens t commit survived since
+    local lens t commit survived since resting
     due_out=() rest_out=()
-    local -a rows=()
+    local -a rows=() scouts=()
     while IFS=$'\t' read -r lens t commit survived since; do
-        if [ "$t" -ne 0 ] && [ "$survived" = 0 ] && [ "$since" -lt "$SWEEP_EVERY" ]; then
+        resting=0
+        [ "$survived" = 0 ] && resting=1
+        is_feature "$lens" && [ "$survived" != - ] && resting=1
+        if [ "$t" -ne 0 ] && [ "$resting" = 1 ] && [ "$since" -lt "$SWEEP_EVERY" ]; then
             rest_out+=("$lens ($since of $SWEEP_EVERY commits since $commit)")
+        elif is_feature "$lens"; then
+            scouts+=("$t"$'\t'"$lens")
         else
             rows+=("$t"$'\t'"$lens")
         fi
     done < <(lens_table)
-    [ ${#rows[@]} -gt 0 ] || return 0
-    mapfile -t due_out < <(printf '%s\n' "${rows[@]}" | sort -s -n -k1,1 | head -n "$SWEEP_WIDTH" | cut -f2)
+    # The feature lens longest rested takes one place, unless that would be the
+    # only place and an audit lens is due: what is wrong comes before what is missing.
+    local room=$SWEEP_WIDTH scout=""
+    [ ${#scouts[@]} -eq 0 ] || scout=$(printf '%s\n' "${scouts[@]}" | sort -s -n -k1,1 | head -n 1 | cut -f2)
+    if [ -n "$scout" ] && [ "$room" -le 1 ] && [ ${#rows[@]} -gt 0 ]; then scout=""; fi
+    [ -z "$scout" ] || room=$((room - 1))
+    [ ${#rows[@]} -eq 0 ] || mapfile -t due_out < <(printf '%s\n' "${rows[@]}" | sort -s -n -k1,1 | head -n "$room" | cut -f2)
+    [ -z "$scout" ] || due_out+=("$scout")
 }
 
 sweep_lenses() { sed -n 3p "$STARTED"; }
@@ -111,9 +132,11 @@ status() {
 # A brief holds all an auditor needs, so that it reads one file, under a
 # directory the session may read, and nothing of the loop's own protocol.
 brief() {   # brief <lens> <commit>
-    local lens=$1 commit=$2 text rules evidence facts rulings known
-    text=$(section "## The auditor" "$DOC")
+    local lens=$1 commit=$2 part="## The auditor" text rules evidence facts rulings known
+    is_feature "$lens" && part="## The scout"
+    text=$(section "$part" "$DOC")
     text=${text//\{COMMIT\}/"$commit"}
+    text=${text//\{ISSUES\}/"${ISSUES_REPO:-none}"}
     text=${text//\{REJECTED\}/"$REJECTED"}
     text=${text//\{TECHNIQUES\}/"$TECHNIQUES"}
     text=${text//\{PROBES_READY\}/"$STATE/probes"}
@@ -145,7 +168,7 @@ start() {
         local arg lens
         for arg in "$@"; do
             lens=${arg%%=*}
-            lenses | grep -qxF -- "$lens" || die "no lens named $lens in $DOC"
+            lenses | grep -qxF -- "$lens" || die "no lens named $lens in $DOC, or it is a feature lens and SWEEP_FEATURES is not 1"
             if [ "$lens" != "$arg" ]; then
                 [[ "${arg#*=}" =~ ^(haiku|sonnet|opus)/(low|medium|high)$ ]] \
                     || die "$arg: a tier is <haiku|sonnet|opus>/<low|medium|high>"
@@ -221,6 +244,6 @@ case "${1:-}" in
     start) shift; start "$@" ;;
     wait) wait_reports ;;
     done) shift; finish "$@" ;;
-    -h|--help) sed -n '2,27p' "$0" ;;
+    -h|--help) sed -n '2,32p' "$0" ;;
     *) die "status, start [lens[=model/effort]...], wait, or done <lens> <returned> <survived>" ;;
 esac

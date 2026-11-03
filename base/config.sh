@@ -29,10 +29,14 @@ FOREIGN=()
 # itself, so a cheaper auditor's false leads come back as its own cost, and a lens
 # that misses what is there rests. It may name another tier for a lens of one
 # sweep, up to opus/high (sweep.md).
+# SWEEP_FEATURES=1 lets a sweep also look for what MComix lacks, reading other
+# programs' manuals and trackers on the web. What it proposes is built only if a
+# ruling gives new features to the loop; otherwise it waits as a question.
 SWEEP_EVERY=25
 SWEEP_WIDTH=5
 SWEEP_MODEL=sonnet
 SWEEP_EFFORT=high
+SWEEP_FEATURES=0
 
 # The only GitHub writes the guard lets through. ISSUES_REPO (owner/name):
 # gh issue create, edit, comment, close and reopen, each with --repo naming
