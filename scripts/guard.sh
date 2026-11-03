@@ -217,6 +217,22 @@ check_rm() {   # $@: the tokens after 'rm'
     return 0
 }
 
+# `git tag` lists when no name follows its options; a name makes a tag, even after
+# --sort. --points-at, --contains and --merged list whatever else is there, and
+# take a commit.
+tag_only_lists() {   # $@: the tokens after 'git tag'
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --sort=*|--format=*|--color|--color=*|--column|--column=*|--no-column|-i|--ignore-case|--omit-empty) ;;
+            --points-at=*|--contains=*|--no-contains=*|--merged=*|--no-merged=*) ;;
+            --points-at|--contains|--no-contains|--merged|--no-merged) [ $# -gt 1 ] && shift ;;
+            [0-9]'>'*|'>'*) ;;   # a redirection, as in 2>/dev/null
+            *) return 1 ;;
+        esac
+        shift
+    done
+}
+
 # ------------------------------------------------------------------- git
 check_git() {   # $@: the tokens after 'git'; $flat is in scope
     local sub="" t
@@ -340,8 +356,8 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
                     deny "git worktree: worktrees you did not create are not yours to touch (prune/move/lock/unlock/repair)." ;;
             esac ;;
         tag)
-            [ $# -eq 0 ] || has "$args" ' (-l|--list|-n[0-9]*) ' \
-                || deny "git tag: releases are the user's." ;;
+            [ $# -eq 0 ] || has "$args" ' (-l|--list|-n[0-9]*) ' || tag_only_lists "$@" \
+                || deny "git tag: releases are the user's. To read: -l, or options alone (--sort, --format, --points-at, --contains, --merged)." ;;
         remote)
             [ $# -eq 0 ] || has "$args" ' (-v|show|get-url) ' \
                 || deny "git remote: remotes are the user's." ;;
@@ -393,6 +409,8 @@ check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; of what reach
         release)  case "$act" in list|view|download) return 0 ;; esac ;;
         repo)     [ "$act" = view ] && return 0 ;;
         workflow) case "$act" in list|view) return 0 ;; esac ;;
+        variable) [ "$act" = list ] && return 0 ;;
+        attestation) [ "$act" = verify ] && return 0 ;;
         api)
             if [ "$act" = graphql ]; then
                 # Always a POST, but a query only reads: some reads (Discussions
@@ -406,7 +424,7 @@ check_gh() {   # $@: the tokens after 'gh'. Reading is the loop's; of what reach
             fi
             has " $* " ' (-X|--method)[ =]?(POST|PUT|PATCH|DELETE)| (-f|-F|--field|--raw-field|--input)[ =]' || return 0 ;;
     esac
-    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release, project, label: list and view; api GET; api graphql with a query) and writes only what state/config.sh allows (issues of ISSUES_REPO; items and fields of ISSUES_PROJECT); the rest of what reaches GitHub is the user's."
+    deny "gh $sub $act: the loop only reads GitHub (run, pr, issue, release, project, label: list and view; variable list; attestation verify; api GET; api graphql with a query) and writes only what state/config.sh allows (issues of ISSUES_REPO; items and fields of ISSUES_PROJECT); the rest of what reaches GitHub is the user's."
 }
 
 check_gh_issue() {   # $1: create|edit|comment|close|reopen, then its arguments

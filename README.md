@@ -183,12 +183,12 @@ Run `scripts/publish-base.sh` by hand, with no loop session open.
 It copies `state/` into `base/`:
 
 - **Whole** – techniques, probes and `rejected.md`. Also the rulings and `project.md`, as the author's worked example.
-- **Trimmed** – `notes.md`. The sections about one installation are blanked. The gate numbers are marked as a seed.
+- **Trimmed** – `notes.md`. The sections about one installation are blanked, and the lines about its checkout and machine are dropped. The gate numbers are marked as a seed.
 - **Never** – `config.sh`, `commits.log`, `sweeps.log` and `scratch/`.
 
 It replaces your home path in what it copies.
 It regenerates the index files, adds a `log.md` entry and checks conformance.
-Last, it lists lines that look personal: a home path, a GPU name, another session's review process.
+Last, it lists lines that look personal: a home path in any spelling, the checkout's path, a GPU name, another session's review process.
 Reword or drop them before you commit.
 
 ## Adapting it to another project

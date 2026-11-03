@@ -35,14 +35,16 @@ awk '
     }
     /^## Leads worth picking up/       { keep = 1 }
     /^## Prompt corrections/           { print; print ""; print "None."; keep = 0; next }
+    keep && /^[[:space:]]+(Loop:|Checkout:|This machine:|Published release )/ { next }   # one checkout, not a gate number
     keep { print }
 ' "$NOTES" > "$BASE/notes.md"
 
 # never publish the publisher's home directory
-grep -rlF "$HOME/" "$BASE" --include='*.md' 2>/dev/null | while read -r f; do sed -i "s|$HOME/|/home/<user>/|g" "$f"; done
+grep -rlF "$HOME" "$BASE" --include='*.md' 2>/dev/null | while read -r f; do sed -i "s|$HOME\b|/home/<user>|g" "$f"; done
 
 $OKF --state "$BASE" index >/dev/null
-commit=$(git -C "$(resolve_repo 2>/dev/null || echo .)" rev-parse --short HEAD 2>/dev/null || echo unknown)
+repo=$(resolve_repo 2>/dev/null)
+commit=$(git -C "${repo:-.}" rev-parse --short HEAD 2>/dev/null || echo unknown)
 today=$(date -u +%F)
 {
     if [ -e "$BASE/log.md" ]; then sed -n '1,2p' "$BASE/log.md"; else printf '# Update log\n\n'; fi
@@ -54,8 +56,13 @@ mv "$BASE/log.md.new" "$BASE/log.md"
 
 echo "base/ updated from state/."
 $OKF --state "$BASE" check && echo "  conformance: clean"
-flagged=$(grep -rnE 'GeForce|RTX [0-9]|Radeon|PR-prep|mcomix-push|/home/[a-z][a-z0-9_-]*/' \
-    "$BASE/techniques" "$BASE/rejected.md" "$BASE/notes.md" "$BASE/probes" 2>/dev/null)
+# This installation's own paths too, in any spelling: a probe under Wine writes Z:\home\me.
+flagged=$({
+    grep -rnIE 'GeForce|RTX [0-9]|Radeon|PR-prep|mcomix-push|/home/[a-z][a-z0-9_-]*/' \
+        "$BASE/techniques" "$BASE/rejected.md" "$BASE/notes.md" "$BASE/probes"
+    grep -rnIF -e "$HOME" -e "${HOME//\//\\}" ${repo:+-e "$repo"} \
+        "$BASE/techniques" "$BASE/rejected.md" "$BASE/notes.md" "$BASE/probes"
+} 2>/dev/null | sort -u)
 if [ -n "$flagged" ]; then
     printf '%s\n' "$flagged" | sed 's/^/  /'
     echo "  ^ machine- or person-specific; reword or drop before committing"

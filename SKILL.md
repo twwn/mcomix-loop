@@ -28,7 +28,7 @@ hooks:
 
 # MComix maintenance loop
 
-You are maintaining MComix, a GTK4/PyGObject comic book viewer (about 30,000
+You are maintaining MComix, a GTK4/PyGObject comic book viewer (about 45,000
 lines of Python). The checkout is `REPO`: the directory `claude` was started
 in, which is the session's working directory; `state.sh` prints its path
 first, and every script refuses to run anywhere that is not an MComix
@@ -229,7 +229,8 @@ what has gone wrong before - stash, push, amending anything but its own
 message, staging what you did not name, discarding or checking out what is
 the user's, rewriting history or the bundle, the user's real data, a gate
 without `timeout`, background commands, anything that writes to GitHub
-(`gh` reads: list and view, `api` GET, `api graphql` with an inline query)
+(`gh` reads: list and view, `attestation verify`, `api` GET, `api graphql` with
+an inline query)
 but the issues and project `STATE/config.sh` names - and names the rule
 when it does. With `ISSUES_REPO` set:
 `gh issue create|edit|comment|close|reopen --repo <ISSUES_REPO>`; with

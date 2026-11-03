@@ -61,7 +61,8 @@ and refactoring, with documentation and comment coverage close behind.
   are not repeated here because they drift. `pygobject-stubs` is built for GTK4 by default, which is what
   this code uses.
 - **Archive handlers** in `mcomix/archive/`: zip, tar, rar (libunrar and
-  external), 7z, lha, PDF (native PyMuPDF and external mutool), mobi.
+  external), 7z, lha, PDF (native PyMuPDF and external mutool), mobi, EPUB,
+  KFX, DjVu (external).
 - **Translations:** `mcomix/messages/mcomix.pot` and one catalogue per
   language, `.po` and compiled `.mo` both committed. GTK's own catalogues
   (`/usr/share/locale/<lang>/LC_MESSAGES/gtk40.mo`) are LGPL and a legitimate
@@ -75,5 +76,5 @@ and refactoring, with documentation and comment coverage close behind.
   `FileActions` in `mcomix/file_actions.py`.
 - **Test data** is in `test/files/`: images in several JPEG and PNG modes
   with Exif-rotated variants (described in `test/test_image_tools.py`), and
-  68 archives including encrypted ones (password `password`).
+  some 70 archives including encrypted ones (password `password`).
 - `flake8` ignores E501 by configuration; `--select=F` is the gate.
