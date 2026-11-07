@@ -14,7 +14,8 @@
 #   SCRATCH    $STATE/scratch          gate logs, exports, iteration.txt; not part of the bundle
 #   SESSIONS   $SCRATCH/sessions       one empty file per session the guard has run in (subagent-guard.sh)
 #   SWEEP      $SCRATCH/sweep          the open sweep's briefs, probes and reports (sweep.sh)
-#   SWEEPS     $STATE/sweeps.log       what each lens of each sweep returned, what survived and at what model and effort (sweep.sh)
+#   SWEEPS     $STATE/sweeps.log       what each lens of each sweep returned, what survived, at what model and effort, and what it took of the 5-hour window (sweep.sh)
+#   USAGE      $SCRATCH/usage          the plan's usage windows as the status line last read them (statusline.sh)
 #   CAMPAIGN  $REPO/.claude/worktrees/campaign — inside the project directory,
 #             next to where the harness puts subagent worktrees, so no extra
 #             permission scope is needed; .claude/ must be in .git/info/exclude.
@@ -39,6 +40,7 @@ SCRATCH=$STATE/scratch
 SESSIONS=$SCRATCH/sessions
 SWEEP=$SCRATCH/sweep
 SWEEPS=$STATE/sweeps.log
+USAGE=$SCRATCH/usage
 OKF="python3 -S $SKILL_DIR/scripts/okf.py"   # -S: stdlib only, and site's start-up is two thirds of its run
 
 # Per-installation settings, overridable in $STATE/config.sh (seeded from
@@ -56,8 +58,47 @@ SWEEP_WIDTH=5      # auditors at once
 SWEEP_MODEL=sonnet # the model and effort of an auditor, unless the sweep names another for its lens
 SWEEP_EFFORT=high
 SWEEP_FEATURES=0   # 1: a sweep may also look for what MComix lacks (the feature lenses in sweep.md)
+SWEEP_CALLS=40     # tool calls an auditor stops at; each reads again all the calls before it
+SWEEP_LENS_COST=7  # percent of the 5-hour window one lens takes, until sweeps.log has measured it
+WINDOW_RESERVE=10  # percent of the 5-hour window kept for finishing an iteration; past 100 minus this, nothing new starts
 # shellcheck disable=SC1091
 [ -r "$STATE/config.sh" ] && . "$STATE/config.sh"
+
+# window: the plan's 5-hour and 7-day windows, from the status line's last
+# reading. Sets W_PCT (percent used) and W_RESET (Unix seconds), W7_PCT and
+# W7_RESET, and W_AGE (seconds since the reading); each is - when unknown. A
+# window that has reset since the reading counts as 0 used, its reset unknown.
+window() {
+    local at="" p="" r="" p7="" r7="" rest now
+    printf -v now '%(%s)T' -1
+    [ -r "$USAGE" ] && IFS=$'\t' read -r at p r p7 r7 rest < "$USAGE"
+    W_PCT=- W_RESET=- W7_PCT=- W7_RESET=- W_AGE=-
+    [[ "$at" =~ ^[0-9]+$ ]] || return 0
+    W_AGE=$((now - at))
+    if [[ "$p" =~ ^[0-9]+$ && "$r" =~ ^[0-9]+$ ]]; then
+        if [ "$r" -gt "$now" ]; then W_PCT=$p W_RESET=$r; else W_PCT=0; fi
+    fi
+    if [[ "$p7" =~ ^[0-9]+$ && "$r7" =~ ^[0-9]+$ ]]; then
+        if [ "$r7" -gt "$now" ]; then W7_PCT=$p7 W7_RESET=$r7; else W7_PCT=0; fi
+    fi
+    return 0
+}
+
+# window_wake: the delaySeconds that wakes the loop a minute after the 5-hour
+# window resets, within ScheduleWakeup's 60 to 3600; 3600 when the reset is unknown.
+window_wake() {
+    local now s=3600
+    printf -v now '%(%s)T' -1
+    [[ "$W_RESET" =~ ^[0-9]+$ ]] && s=$((W_RESET - now + 60))
+    [ "$s" -ge 60 ] || s=60
+    [ "$s" -le 3600 ] || s=3600
+    echo "$s"
+}
+
+# statusline_set: the settings run statusline.sh, which keeps the reading.
+statusline_set() {
+    grep -qsF statusline.sh "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json" "$1/.claude/settings.json" "$1/.claude/settings.local.json"
+}
 
 # subagents_guarded <checkout>: the settings name the hook that guards subagents.
 # It reads only the text: a session started before the merge may not have the hook yet.

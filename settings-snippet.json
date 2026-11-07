@@ -24,6 +24,10 @@
   "worktree": {
     "baseRef": "head"
   },
+  "statusLine": {
+    "type": "command",
+    "command": "d=$HOME/.claude/skills/mcomix-loop; [ -d \"$d/scripts\" ] || d=${CLAUDE_PROJECT_DIR:-.}/.claude/skills/mcomix-loop; [ -x \"$d/scripts/statusline.sh\" ] || exit 0; exec \"$d/scripts/statusline.sh\""
+  },
   "hooks": {
     "PreToolUse": [
       {

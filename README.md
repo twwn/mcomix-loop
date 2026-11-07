@@ -33,7 +33,8 @@ The loop runs unattended.
 - **Keeps out of your MComix data** – `~/.config/mcomix` and `~/.local/share/mcomix`. The hook refuses both. With the settings snippet merged, Claude Code denies them too.
 - **Uses `auto` permission mode** – a permission prompt would stall a loop nobody watches. Claude Code's classifier still reviews every command but one: closing an issue in your repository, which the settings snippet allows.
 - **May open a git worktree** – at `<checkout>/.claude/worktrees/campaign`, for a change too large for one commit. Only for a campaign you approved.
-- **May start subagents** – when no lead can be worked, up to five auditors, each in a worktree of its own under `<checkout>/.claude/worktrees/`. They change nothing in the checkout, commit nothing and post nothing, and the guard holds them to it. Each costs a subagent's tokens, so a sweep costs about what several iterations do. It needs the guard's hook in your settings. `SWEEP_EVERY=0` in `config.sh` turns sweeps off.
+- **May start subagents** – when no lead can be worked, up to five auditors, each in a worktree of its own under `<checkout>/.claude/worktrees/`. They change nothing in the checkout, commit nothing and post nothing, and the guard holds them to it. Each costs a subagent's tokens: on the author's plan 5 to 7% of the 5-hour window, so a five-lens sweep costs about what an hour of the loop does. It needs the guard's hook in your settings. `SWEEP_EVERY=0` in `config.sh` turns sweeps off.
+- **Spends your plan's 5-hour window** – the same one your own sessions use. With the status line from the settings snippet, it knows how much is left. A sweep starts only the auditors that fit. Past the reserve, 10% by default, it starts nothing new and waits for the reset. Without the status line, it works blind and is cut off when the window runs out.
 - **May look for features** – only with `SWEEP_FEATURES=1`. One subagent of a sweep is then a scout, which looks for what MComix lacks and reads other programs' manuals and trackers on the web. What it proposes is built only if one of your rulings gives new features to the loop. Otherwise it waits in the notes as a question. Off by default.
 
 If that is more than you want an unattended process to do, do not install it.
@@ -79,7 +80,7 @@ Then:
 
    Three parts describe one installation. Adapt them:
 
-   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12, or 3.13 before 3.13.6, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once; `SWEEP_MODEL` and `SWEEP_EFFORT` what they run at (Sonnet, high), which the loop may change for one lens of a sweep, up to Opus, high; `SWEEP_FEATURES=1` lets a sweep look for what MComix lacks.
+   - `config.sh` – set `WORKERS` to what you measure; `-n auto` is slower on this suite. On Python 3.12, or 3.13 before 3.13.6, set `EXPORT_DIR` to a short path. To let the loop file, update and close issues, set `ISSUES_REPO` (`owner/name`) and `ISSUES_PROJECT` (`owner/number`); project items need `gh auth refresh -s project`. `SWEEP_EVERY` and `SWEEP_WIDTH` set how often sweeps come back and how many auditors run at once; `SWEEP_MODEL` and `SWEEP_EFFORT` what they run at (Sonnet, high), which the loop may change for one lens of a sweep, up to Opus, high; `SWEEP_CALLS` the tool calls an auditor stops at (40); `SWEEP_FEATURES=1` lets a sweep look for what MComix lacks. `WINDOW_RESERVE` is the share of the 5-hour window kept for finishing an iteration (10%); `SWEEP_LENS_COST` what one auditor takes of it until the loop has measured it (7%).
    - `project.md` – replace the author's facts with yours: where your fork stands, how you release, which campaigns are finished.
    - `decisions/` – the author's rulings, one file each. Keep those tagged `program` if you build on this fork: they say why the program behaves as it does. Delete those tagged `installation`. Confirm the ones you keep: `python3 scripts/okf.py confirm --as <you> state/decisions/*.md`.
 
@@ -97,6 +98,7 @@ Then:
    - `cleanupPeriodDays` – days before Claude Code deletes transcripts. The default of 30 removes those the loop's commit messages cite as evidence.
    - `attribution.commit` – the commit trailer. Empty, so the loop's commits carry none. Yours to change.
    - `worktree.baseRef: head` – keeps subagent worktrees off `origin/master`.
+   - `statusLine` – shows the 5-hour and 7-day windows and the context, and keeps the windows in `state/scratch/usage` for the loop. The windows are your account's, so any session's status line serves. It does nothing if the skill is not installed. To keep a status line of your own, pass its input on: `input=$(cat); printf '%s' "$input" | ~/.claude/skills/mcomix-loop/scripts/statusline.sh --quiet`.
    - `hooks.PreToolUse` – the guard for the loop's subagents. A skill's own hooks do not fire inside a subagent, so without this one they run unguarded, and `state.sh` says so. It runs on every Bash, Monitor, Write and Edit call of every session. Outside the loop's subagents it exits at once, after a few milliseconds, and it does nothing if the skill is not installed.
 
 3. **Hide `.claude/` in the checkout:** `echo '.claude/' >> .git/info/exclude`. The campaign worktree and Claude Code's subagent worktrees live there. The loop reads an untracked path in `git status` as someone's work in progress.
@@ -120,20 +122,22 @@ cd <checkout> && claude
 At the first wakeup:
 
 - `/hooks` lists three session hooks, and the subagent hook from your settings.
-- The first tool call is `state.sh`. Its first line names your checkout.
+- The first tool call is `state.sh`. Its first line names your checkout. Its `== usage ==` section names the 5-hour window; "unknown" there means the status line is not set.
 - `/permissions` → Recently denied is empty.
 
 At the second wakeup, `/context` shows the skill once, not twice.
 
 - **Cancel** – `Esc` while the loop waits cancels the pending wakeup.
 - **Seven days** – Claude Code ends every loop after seven days. Restart it with the same command.
+- **The 5-hour window** – past its reserve, the loop wakes once an hour, or a minute after the reset, and does nothing else until the reset. If the window runs out mid-turn anyway, Claude Code continues the turn by itself at the reset unless you press `Esc`.
 - **Why it stopped** – in its last report, and in `state/notes.md` under `Questions for the user`.
 
 ## How it works
 
 - **`SKILL.md`** – the protocol. Its body is static, so it costs its tokens once per session and once after each compaction.
 - **`scripts/state.sh`** – the first command of every iteration. It prints the checkout and its branch, the tree, the commits since the notes' baseline, the issues and discussions on GitHub, the notes and the names of the techniques.
-- **`sweep.md`, `scripts/sweep.sh`** – the sweep: how the loop runs one, what an auditor is told, and the lenses. Read only when a sweep is due. Each lens's result and tier go into `state/sweeps.log`. A lens runs until it finds nothing, then rests until enough commits have come. A feature lens rests after every run, and a sweep takes at most one, so that it cannot keep the loop going by itself.
+- **`scripts/statusline.sh`** – the status line. Claude Code passes it the plan's usage windows, and it keeps them in `state/scratch/usage`. `state.sh usage` prints them, with what they allow.
+- **`sweep.md`, `scripts/sweep.sh`** – the sweep: how the loop runs one, what an auditor is told, and the lenses. Read only when a sweep is due. Each lens's result, its tier and what it took of the 5-hour window go into `state/sweeps.log`; the next sweep plans with the last three measured. A lens runs until it finds nothing, then rests until enough commits have come. A feature lens rests after every run, and a sweep takes at most one, so that it cannot keep the loop going by itself.
 - **`scripts/gates.sh`** – runs the suite, then flake8 beside mypy, each with a hard timeout. It prints one line per gate.
 - **Exported trees** – `gates.sh --export` measures a clean `git archive`. Exports share one mypy cache, so mypy takes a second there, not half a minute.
 - **Worktrees** – `gates.sh --tree` keeps the logs of a tree other than the checkout in `state/scratch/logs/<tree>/`, so gates can run at once in two worktrees. Exports cannot: each new one removes the last.

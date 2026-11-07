@@ -116,7 +116,8 @@ $ARGUMENTS
 
 ## Ending an iteration
 
-Every iteration ends the same way, whatever it did.
+Every iteration ends the same way, whatever it did, except a wakeup that only
+waits for the 5-hour window (see "The 5-hour window").
 
 1. Rewrite `LOOP_NOTES` (sections below). Add to `LOOP_TECHNIQUES` whatever
    proved itself and to `REJECTED` whatever was examined and left alone (if
@@ -125,7 +126,9 @@ Every iteration ends the same way, whatever it did.
 3. **The last action is `ScheduleWakeup`** with `prompt`: the literal string
    `/mcomix-loop`; `delaySeconds`: `60`, the floor, unless the only work
    left waits on a CI run the loop reads itself — then up to `900`, and the
-   `reason` names the run; never pad it otherwise; `noop`: `false` if
+   `reason` names the run — or the 5-hour window is at its reserve — then
+   what `state.sh usage` prints, up to `3600`, and the `reason` names the
+   reset; never pad it otherwise; `noop`: `false` if
    anything was committed or a campaign advanced, `true` otherwise;
    `reason`: one line naming what the next iteration should pick up.
 
@@ -133,7 +136,8 @@ Every iteration ends the same way, whatever it did.
    `PushNotification` naming the reason — for exactly these, and say which:
    - **Three consecutive quiet iterations**, counted by the `Quiet
      iterations` line: increment when nothing was committed, reset when
-     something was, a campaign advanced or a sweep left a lead. When the leads
+     something was, a campaign advanced or a sweep left a lead; an iteration
+     that waits for the 5-hour window leaves it as it is. When the leads
      run out, a sweep of the lenses `state.sh` lists as due comes first (step 6
      of "Start of every iteration"); after it `DECISIONS` or `project.md` may
      say what comes next — a release commit, a ticket sweep; that is then the
@@ -167,7 +171,8 @@ concept: a net, not the plan.
 Outside a campaign, an iteration takes **as many leads as it can finish and
 verify, one commit each**. One logical change per commit; never a commit that
 bundles two unrelated fixes because they were found together. Stop when the
-next lead would not fit, not after the first commit.
+next lead would not fit, in the iteration or in the 5-hour window, not after
+the first commit.
 
 Inside a campaign (see "Campaigns") the rule inverts: the campaign is a batch
 that `BRANCH` receives as one commit when all of it is done, and every iteration
@@ -185,7 +190,11 @@ pushes that batch as far as it can.
 2. **A dirty tree** is someone's work in progress: leave it alone, never
    stage it, and measure in an export instead (`gates.sh --export`, which
    unpacks `git archive HEAD` under `SCRATCH`), because numbers taken over
-   someone else's uncommitted work are not yours to report.
+   someone else's uncommitted work are not yours to report. The exception is
+   an `iteration.txt` that `state.sh` reports as left behind: the iteration
+   that wrote it was cut off, and the files it names for its lead are the
+   loop's own. That lead is the one in hand; fold the file into this
+   iteration's and go on.
 
 3. **Account for the commits that are not yours.** `state.sh` lists what
    landed since the commit `LOOP_NOTES` measured at; the user commits by hand
@@ -225,9 +234,34 @@ files ("which modules import X", "where is option Y read") goes to an
 probe output goes to files under `SCRATCH` and is grepped, never read whole.
 Append each finding to `SCRATCH/iteration.txt` as it arrives, one append per
 finding: after a compaction it is the only complete record of this
-iteration's uncommitted findings. Commands run in `REPO`; never `cd` away
+iteration's uncommitted findings. Before the first edit in `REPO` for a lead,
+append the lead and the files it will change: an iteration the usage limit
+cuts off may have no call left to say so. Commands run in `REPO`; never `cd` away
 from it (a `cd` outside the project directory is reset anyway), and name
 anything under `STATE` by its absolute path.
+
+**The 5-hour window.** The plan allows so much use per five hours, counted
+for the whole account, so the user's own sessions draw on it too. When it is
+used up, every request is refused until it resets: the turn is cut off
+wherever it is, and a sweep's auditors lose all their work. `state.sh` prints
+how much is used, when it resets, and the reserve kept for finishing an
+iteration (`WINDOW_RESERVE` in `STATE/config.sh`); `state.sh usage` prints
+only that, and runs before each further lead and before a sweep. Below the
+reserve, work as usual; `sweep.sh start` takes only the lenses that fit. At
+the reserve, start nothing new, neither a lead nor a sweep nor a subagent:
+finish the commit in hand or put it aside in `LOOP_NOTES`, end the iteration
+as usual, and wake at the reset with what `state.sh usage` prints. A wakeup
+whose `state.sh` finds the window still at the reserve, with nothing in hand,
+schedules the next wakeup and reports one line; the notes stay as they are.
+Waiting for the window is not running out of work. When
+Claude Code says the usage limit is reached ("a short grace allowance
+remains"), the allowance is a few calls at most, and subagents still running
+spend it too: five auditors once spent all of it before the main thread's next
+request. Make one Bash call that rewrites `LOOP_NOTES` with what is open and
+then runs `state.sh usage`, then `ScheduleWakeup` with the `delaySeconds` it
+prints (3600 if it printed none) and `noop` true, and end the turn.
+Never `stop: true` for it: the limit is a wait, not an end. What that call
+does not save, `SCRATCH/iteration.txt` already holds.
 
 ## Guardrails
 
@@ -313,9 +347,10 @@ that fetches a tool to run it (`uvx <tool>`, `uvx --from git+<url>`, `pipx
 run`, `npx`) as "Code from External". It refused zizmor,
 flatpak-builder-lint and vulture that way, and let the same kind of command
 through at other times, so a fetch that once worked is no plan. Check with
-`which`; a missing tool is a question under `Questions for the user`, naming
-the package, and the other leads go on meanwhile. Do not retry the fetch in
-another form; the denial's "stop and explain to the user" means that
+`which`; a missing tool or package (a Python module, a system library) is a
+question under `Questions for the user`, naming the package, and the other
+leads go on meanwhile; the loop never installs one itself. Do not retry the
+fetch in another form; the denial's "stop and explain to the user" means that
 question, not a stop. A technique that names a fetch command is corrected
 to the installed tool once there is one.
 

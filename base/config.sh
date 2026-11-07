@@ -37,6 +37,19 @@ SWEEP_WIDTH=5
 SWEEP_MODEL=sonnet
 SWEEP_EFFORT=high
 SWEEP_FEATURES=0
+# SWEEP_CALLS is the number of tool calls an auditor stops at. Each call reads
+# again all that came before it, so an auditor's cost grows faster than its
+# calls: at sonnet/high, 49 to 86 requests cost the author's auditors 1.7 to 3.0
+# USD each at list prices, two thirds to three quarters of it cache reads.
+SWEEP_CALLS=40
+
+# The plan's 5-hour window, as the status line in settings-snippet.json reads
+# it. WINDOW_RESERVE is the percent kept for finishing an iteration: past 100
+# minus it, the loop starts nothing new and waits for the reset. A sweep starts
+# only the lenses that fit below it; SWEEP_LENS_COST is the percent one lens
+# takes until sweeps.log has measured it (5 to 7 on the author's plan).
+WINDOW_RESERVE=10
+SWEEP_LENS_COST=7
 
 # The only GitHub writes the guard lets through. ISSUES_REPO (owner/name):
 # gh issue create, edit, comment, close and reopen, each with --repo naming

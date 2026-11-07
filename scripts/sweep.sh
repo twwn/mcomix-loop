@@ -30,6 +30,16 @@
 # of their own. A sweep takes at most one unless it is named, and one rests after
 # every run that reported, whatever it left: such a lens nearly always finds
 # something, and that must not keep the loop going.
+#
+# The plan's 5-hour window (statusline.sh keeps the reading) decides how many
+# lenses start: what is used, plus what each lens takes, must stay under
+# 100 - WINDOW_RESERVE, or the auditors are cut off with the window and their
+# work is lost. `start` takes the first that fit and opens nothing when none
+# does. What a lens takes is measured: `start` notes the window, the last `done`
+# reads it again, and sweeps.log's eighth column holds the difference per lens
+# (`-` when unmeasured: no reading, or the window reset meanwhile). The mean of
+# the last three sweeps measured is the estimate, SWEEP_LENS_COST before any.
+# The lines of a sweep go into sweeps.log when it closes, all at that time.
 
 set -u
 case "$0" in */*) . "${0%/*}/paths.sh" ;; *) . ./paths.sh ;; esac
@@ -103,6 +113,35 @@ sort_lenses() {
 
 sweep_lenses() { sed -n 3p "$STARTED"; }
 
+# What one lens takes of the 5-hour window, in percent, rounded up.
+lens_cost() {
+    local c=""
+    [ -e "$SWEEPS" ] && c=$(awk -F'\t' '$8 ~ /^[0-9]+$/ && !($1 in seen) { seen[$1]; v[++n] = $8 }
+        END { if (n) { k = n > 3 ? 3 : n; for (i = n - k + 1; i <= n; i++) s += v[i]; m = s / k
+              printf "%d\n", m == int(m) ? m : int(m) + 1 } }' "$SWEEPS")
+    [[ "$c" =~ ^[0-9]+$ && "$c" -ge 1 ]] || c=$SWEEP_LENS_COST
+    [[ "$c" =~ ^[0-9]+$ && "$c" -ge 1 ]] || c=1
+    echo "$c"
+}
+
+# fit <n>: sets FIT to how many of n lenses the 5-hour window has room for (n
+# when it is unknown), COST to what one takes, and the W_* of `window`.
+fit() {
+    window
+    COST=$(lens_cost)
+    FIT=$1
+    [ "$W_PCT" != - ] || return 0
+    local room=$((100 - WINDOW_RESERVE - W_PCT))
+    [ "$room" -gt 0 ] || room=0
+    [ $((room / COST)) -ge "$FIT" ] || FIT=$((room / COST))
+}
+
+window_text() {   # after fit: the reading, for a message
+    local s="the 5-hour window is $W_PCT% used"
+    [ "$W_RESET" = - ] || s+=" until $(printf '%(%H:%M)T' "$W_RESET")"
+    printf '%s; a lens takes about %s%%, and %s%% stays for the rest of the iteration (WINDOW_RESERVE)' "$s" "$COST" "$WINDOW_RESERVE"
+}
+
 reports_line() {
     local lens in="" missing=""
     for lens in $(sweep_lenses); do
@@ -123,7 +162,11 @@ status() {
     [ -e "$REPO/.claude/worktrees/campaign" ] && { echo "none while a campaign is open"; return 0; }
     local -a due rest
     sort_lenses due rest
-    if [ ${#due[@]} -gt 0 ]; then echo "due when no lead can be worked (read $DOC): ${due[*]}"
+    if [ ${#due[@]} -gt 0 ]; then
+        fit ${#due[@]}
+        if [ "$FIT" -eq ${#due[@]} ]; then echo "due when no lead can be worked (read $DOC): ${due[*]}"
+        elif [ "$FIT" -gt 0 ]; then echo "due when no lead can be worked (read $DOC): ${due[*]}; $(window_text), so a sweep now takes ${due[*]:0:FIT}"
+        else echo "due: ${due[*]}; but $(window_text), so none fits: a sweep waits for the reset (SKILL.md, \"The 5-hour window\")"; fi
     else echo "none due"; fi
     if [ ${#rest[@]} -gt 0 ]; then printf 'resting: %s\n' "$(printf '%s; ' "${rest[@]}")"; fi
     return 0
@@ -143,6 +186,7 @@ brief() {   # brief <lens> <commit>
     text=${text//\{PROBES\}/"$SWEEP/$lens"}
     text=${text//\{REPORT\}/"$SWEEP/$lens.md"}
     text=${text//\{LENS\}/"$lens"}
+    text=${text//\{CALLS\}/"$SWEEP_CALLS"}
     rules=$(awk '/^\*\*Nothing may touch/ { on = 1 } /^## Handoff/ { on = 0 } on' "$SKILL_DIR/SKILL.md")
     evidence=$(section "## Evidence standards" "$SKILL_DIR/SKILL.md")
     facts=$(section "## Project facts" "$SKILL_DIR/reference.md")
@@ -180,6 +224,14 @@ start() {
         sort_lenses chosen rest
         [ ${#chosen[@]} -gt 0 ] || die "no lens is due"
     fi
+    # The first that fit the 5-hour window: in the order named, or the longest
+    # rested first with the feature lens last.
+    fit ${#chosen[@]}
+    [ "$FIT" -gt 0 ] || die "$(window_text), so no lens fits and no sweep is opened. End the iteration and wake at the reset (SKILL.md, \"The 5-hour window\")."
+    if [ "$FIT" -lt ${#chosen[@]} ]; then
+        echo "sweep: $(window_text), so it takes $FIT of the ${#chosen[@]}; left for a later sweep: ${chosen[*]:FIT}" >&2
+        chosen=("${chosen[@]:0:FIT}")
+    fi
     local commit
     commit=$(git -C "$REPO" rev-parse --short HEAD) || die "no HEAD"
     rm -rf "$SWEEP"
@@ -194,7 +246,8 @@ start() {
         t=${tier[$lens]:-$SWEEP_MODEL/$SWEEP_EFFORT}
         printf '%s\t%s\t%s\n' "$lens" "${t%/*}" "${t#*/}" >> "$TIERS"
     done
-    printf '%s\n%s\n%s\n' "$(now)" "$commit" "${chosen[*]}" > "$STARTED"
+    # The fourth line is the window at the start, which `done` measures from.
+    printf '%s\n%s\n%s\n%s %s\n' "$(now)" "$commit" "${chosen[*]}" "$W_PCT" "$W_RESET" > "$STARTED"
     for lens in "${chosen[@]}"; do
         t=${tier[$lens]:-$SWEEP_MODEL/$SWEEP_EFFORT}
         echo "$lens ${t%/*} ${t#*/}: Read $SWEEP/$lens.brief.md in full and do what it says."
@@ -226,17 +279,34 @@ finish() {   # finish <lens> <returned> <survived>
     case " $(sweep_lenses) " in *" $lens "*) ;; *) die "$lens is not in the open sweep: $(sweep_lenses)" ;; esac
     [[ "$returned" =~ ^([0-9]+|-)$ && "$survived" =~ ^([0-9]+|-)$ ]] || die "returned and survived are numbers, or - for a lens that never reported"
     { read -r at; read -r commit; } < "$STARTED"
-    if ! grep -qxF -- "$lens" "$LOGGED" 2>/dev/null; then
-        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(now)" "$lens" "$commit" "$returned" "$survived" \
-            "$(awk -F'\t' -v l="$lens" '$1 == l { print $2 "\t" $3 }' "$TIERS" 2>/dev/null)" >> "$SWEEPS"
-        printf '%s\n' "$lens" >> "$LOGGED"
+    # LOGGED holds a line per lens recorded, without the time and the cost,
+    # which the close adds. (A line with the lens alone is from an older
+    # sweep.sh, whose line is in sweeps.log already.)
+    logged() { awk -F'\t' -v l="$1" '$1 == l { f = 1 } END { exit !f }' "$LOGGED" 2>/dev/null; }
+    if ! logged "$lens"; then
+        printf '%s\t%s\t%s\t%s\t%s\n' "$lens" "$commit" "$returned" "$survived" \
+            "$(awk -F'\t' -v l="$lens" '$1 == l { print $2 "\t" $3 }' "$TIERS" 2>/dev/null)" >> "$LOGGED"
     fi
     names=$(sweep_lenses)
     for l in $names; do
-        grep -qxF -- "$l" "$LOGGED" || left+=" $l"
+        logged "$l" || left+=" $l"
     done
-    if [ -n "$left" ]; then echo "recorded $lens; still to record:$left"
-    else rm -f "$STARTED" "$LOGGED"; echo "recorded $lens; the sweep is closed"; fi
+    if [ -n "$left" ]; then echo "recorded $lens; still to record:$left"; return 0; fi
+
+    # What the sweep took of the 5-hour window, per lens, if one window held it all.
+    local before="" reset="" cost=- n d
+    read -r before reset < <(sed -n 4p "$STARTED")
+    window
+    n=$(wc -w <<< "$names")
+    if [[ "$before" =~ ^[0-9]+$ && "$reset" =~ ^[0-9]+$ && "$W_PCT" =~ ^[0-9]+$ && "$W_RESET" =~ ^[0-9]+$ ]]; then
+        d=$((W_RESET - reset))
+        [ "${d#-}" -lt 600 ] && [ "$W_PCT" -gt "$before" ] && cost=$(( (W_PCT - before + n - 1) / n ))
+    fi
+    awk -F'\t' -v OFS='\t' -v t="$(now)" -v c="$cost" 'NF >= 4 {
+        print t, $1, $2, $3, $4, ($5 == "" ? "-" : $5), ($6 == "" ? "-" : $6), c }' "$LOGGED" >> "$SWEEPS"
+    rm -f "$STARTED" "$LOGGED"
+    if [ "$cost" = - ]; then echo "recorded $lens; the sweep is closed (what it took of the 5-hour window is not measured)"
+    else echo "recorded $lens; the sweep is closed, having taken about $cost% of the 5-hour window per lens"; fi
 }
 
 case "${1:-}" in
@@ -244,6 +314,6 @@ case "${1:-}" in
     start) shift; start "$@" ;;
     wait) wait_reports ;;
     done) shift; finish "$@" ;;
-    -h|--help) sed -n '2,32p' "$0" ;;
+    -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0" ;;
     *) die "status, start [lens[=model/effort]...], wait, or done <lens> <returned> <survived>" ;;
 esac
