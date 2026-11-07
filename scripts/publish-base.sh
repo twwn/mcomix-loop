@@ -36,6 +36,7 @@ awk '
     /^## Leads worth picking up/       { keep = 1 }
     /^## Prompt corrections/           { print; print ""; print "None."; keep = 0; next }
     keep && /^[[:space:]]+(Loop:|Checkout:|This machine:|Published release )/ { next }   # one checkout, not a gate number
+    keep && /^Quiet iterations:/ { print "Quiet iterations: 0"; next }   # a fresh chain has counted nothing, and has no sweep open
     keep { print }
 ' "$NOTES" > "$BASE/notes.md"
 

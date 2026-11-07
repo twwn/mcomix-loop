@@ -89,3 +89,4 @@
 * [The Wine command-line crash is not seen on Windows](2026-10-29-the-wine-command-line-crash-is-not-seen-on.md) - unconfirmed
 * [A release request first checks the loop's notes](2026-11-01-a-release-request-first-checks-the-loop-s-notes.md) - unconfirmed
 * [The user orders a release, the loop writes its commit](2026-11-03-the-user-orders-a-release-the-loop-writes-its.md) - unconfirmed
+* [A package the loop needs installed goes into the notes for the user](2026-11-07-a-package-or-tool-the-loop-needs-installed-is.md) - unconfirmed
