@@ -117,7 +117,7 @@ $ARGUMENTS
 ## Ending an iteration
 
 Every iteration ends the same way, whatever it did, except a wakeup that only
-waits for the 5-hour window (see "The 5-hour window").
+waits for a usage window (see "The 5-hour window").
 
 1. Rewrite `LOOP_NOTES` (sections below). Add to `LOOP_TECHNIQUES` whatever
    proved itself and to `REJECTED` whatever was examined and left alone (if
@@ -126,7 +126,7 @@ waits for the 5-hour window (see "The 5-hour window").
 3. **The last action is `ScheduleWakeup`** with `prompt`: the literal string
    `/mcomix-loop`; `delaySeconds`: `60`, the floor, unless the only work
    left waits on a CI run the loop reads itself — then up to `900`, and the
-   `reason` names the run — or the 5-hour window is at its reserve — then
+   `reason` names the run — or a usage window is at its reserve — then
    what `state.sh usage` prints, up to `3600`, and the `reason` names the
    reset; never pad it otherwise; `noop`: `false` if
    anything was committed or a campaign advanced, `true` otherwise;
@@ -137,7 +137,7 @@ waits for the 5-hour window (see "The 5-hour window").
    - **Three consecutive quiet iterations**, counted by the `Quiet
      iterations` line: increment when nothing was committed, reset when
      something was, a campaign advanced or a sweep left a lead; an iteration
-     that waits for the 5-hour window leaves it as it is. When the leads
+     that waits for a usage window leaves it as it is. When the leads
      run out, a sweep of the lenses `state.sh` lists as due comes first (step 6
      of "Start of every iteration"); after it `DECISIONS` or `project.md` may
      say what comes next — a release commit, a ticket sweep; that is then the
@@ -253,7 +253,12 @@ finish the commit in hand or put it aside in `LOOP_NOTES`, end the iteration
 as usual, and wake at the reset with what `state.sh usage` prints. A wakeup
 whose `state.sh` finds the window still at the reserve, with nothing in hand,
 schedules the next wakeup and reports one line; the notes stay as they are.
-Waiting for the window is not running out of work. When
+`state.sh` prints only its usage section then, unless an iteration was cut
+off; for a request from the user, `state.sh --full` prints the rest. Waiting
+for the window is not running out of work. The 7-day window counts the same
+use over a week, and `WEEK_RESERVE` of it is left to the user's own sessions:
+at that reserve the same holds, `state.sh usage` says so first and names the
+wakeup, and the loop wakes hourly until the week resets. When
 Claude Code says the usage limit is reached ("a short grace allowance
 remains"), the allowance is a few calls at most, and subagents still running
 spend it too: five auditors once spent all of it before the main thread's next
@@ -269,7 +274,8 @@ The guard (`scripts/guard.sh`, a PreToolUse hook for this session) refuses
 what has gone wrong before - stash, push, amending anything but its own
 message, staging what you did not name, discarding or checking out what is
 the user's, rewriting history or the bundle, the user's real data, a gate
-without `timeout`, background commands, anything that writes to GitHub
+without `timeout`, MComix or Wine outside Xvfb, background commands, anything
+that writes to GitHub
 (`gh` reads: list and view, `attestation verify`, `api` GET, `api graphql` with
 an inline query)
 but the issues and project `STATE/config.sh` names - and names the rule
@@ -313,7 +319,17 @@ preferences file, leaked files into the recent list, and left bookmarks in the
 user's real bookmark store. The guard only sees paths named in a command; a
 probe that opens the real paths from Python is invisible to it.
 
-**Nor may anything reach the user's desktop.** A probe or test never calls a
+**Nor may anything reach the user's desktop.** Everything that imports
+`mcomix` runs under the gate's `env -u WAYLAND_DISPLAY GDK_BACKEND=x11
+xvfb-run -d`, a script that builds no window too: an encrypted archive asks
+for its password in a dialog of its own, and a sweep auditor's plain
+`python3` over `test/files/archives` put five of them on the user's screen.
+On a Wayland desktop `xvfb-run` alone is not enough, since GTK takes the
+session's compositor first. What must not connect to any display (an import
+timed) runs under `env -u DISPLAY -u WAYLAND_DISPLAY` instead. Wine draws on
+the real display too: `xvfb-run -d`. The guard refuses a Python run that imports `mcomix` (by the command,
+the script it names, or the code it passes) and `wine` without them, but not
+what a shell script starts. A probe or test never calls a
 launcher for real — `Gtk.FileLauncher`, `Gtk.UriLauncher`,
 `Gio.AppInfo.launch`: a private bus and Xvfb do not contain one. The portal
 one reached inherited the real `DISPLAY` and opened the installed MComix on
@@ -321,8 +337,8 @@ the user's screen, with the user's settings. Patch the launcher class in the
 module under test and read what it was called with. The session bus leaks
 the same way: MComix can take a name on it (`mcomix/single_instance.py`), so
 a probe or test that starts an MComix gives it a `dbus-daemon` of its own,
-named in that process's `DBUS_SESSION_BUS_ADDRESS`. The guard sees neither;
-the technique "Probes" has both recipes.
+named in that process's `DBUS_SESSION_BUS_ADDRESS`. The guard sees neither
+launcher nor bus; the technique "Probes" has both recipes.
 
 **Clean up what a test or probe starts.** A window left on screen is
 answered by the next test that looks for one. `MComixTest` fails the test that

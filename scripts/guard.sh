@@ -105,6 +105,13 @@ esac
 raw_cmd=$cmd
 [ -z "$cmd" ] && exit 0
 [ "$bg" = true ] && deny "no background commands in the loop: a hang must surface as a timeout, not vanish into a background task."
+# What each auditor of an open sweep runs, so that the main thread can tell which
+# one did what the user saw before it stops one (a stopped auditor's report is
+# lost). The lens shows in the paths: its probes lie under $SWEEP/<lens>/.
+if [ -n "$agent" ] && [ -e "$SWEEP/started" ]; then
+    line=${raw_cmd//$'\n'/ }
+    printf '%(%H:%M:%S)T\t%s\t%s\n' -1 "$agent" "${line:0:400}" >> "$SWEEP/commands.log" 2>/dev/null
+fi
 
 # Heredoc bodies are data (a commit message, a note being appended), not
 # commands: drop every line between a `<<WORD` and its terminator before the
@@ -121,7 +128,11 @@ if [[ "$cmd" == *"<<"* ]]; then
         { line = $0; sub(/^\t+/, "", line); if (line == body) body = "" }
     ')
 fi
-flat=${cmd//$'\n'/ }
+# A continued line is one command; any other line is a command of its own, as
+# after `;`: a probe written by heredoc and run on the next line is checked as
+# that run, not as more arguments of `cat`.
+flat=${cmd//$'\\\n'/ }
+flat=${flat//$'\n'/ ; }
 flat=${flat//$'\t'/ }
 while [[ "$flat" == *"  "* ]]; do flat=${flat//  / }; done
 # A quoted string with a space in it is text - a message, a pattern, a line
@@ -522,6 +533,16 @@ split=${split//\$(/$nl}; split=${split//\`/$nl}; split=${split//(/$nl}; split=${
 mapfile -t segs <<< "$split"
 outer_timeout=0
 has "${segs[0]}" '(^|[[:space:]])timeout[[:space:]].*[[:space:]](sh|bash|dash|zsh)[[:space:]]+(-[a-z]*c)' && outer_timeout=1
+# The display a segment draws on: under xvfb-run, with Wayland ruled out (on a
+# Wayland desktop GTK takes the session's compositor before Xvfb's DISPLAY), or
+# with neither display at all. A shell's -c run under xvfb-run lends its
+# segments the outer xvfb-run.
+outer_xvfb=0 outer_nowayland=0 cdir=""
+re_shell_c='(^|[[:space:]])xvfb-run[[:space:]].*[[:space:]](sh|bash|dash|zsh)[[:space:]]+(-[a-z]*c)'
+re_nowayland='GDK_BACKEND=x11|(^|[[:space:]])-u[[:space:]]*WAYLAND_DISPLAY|--unset=WAYLAND_DISPLAY|(^|[[:space:]])WAYLAND_DISPLAY=([[:space:]]|$)'
+# What a Python run imports that opens dialogs and windows: mcomix, or the test
+# package that builds on it.
+re_imports="(^|[^A-Za-z0-9_.])(import|from)[[:space:]]+(mcomix|test)([.[:space:],;]|\$)|(import_module|__import__)\\([\"'](mcomix|test)"
 for seg in "${segs[@]}"; do
     # Words as the shell passes them on, quotes removed: `bash -c 'git push'`
     # runs git, and `git add '*'` stages everything.
@@ -552,17 +573,32 @@ for seg in "${segs[@]}"; do
     # command (assignments, env, nice, timeout, xvfb-run, a shell's -c); the
     # same word as an argument, a pattern or a file name runs nothing.
     needs_timeout=0; has_timeout=$outer_timeout; wrapper=""
+    on_xvfb=$outer_xvfb no_wayland=$outer_nowayland no_display=0 pythonpath=0
+    if has "$seg" "$re_shell_c"; then
+        outer_xvfb=1
+        has "$seg" "$re_nowayland" && outer_nowayland=1
+    fi
     for ((i = 0; i < ${#toks[@]}; i++)); do
         t=${toks[i]//[\"\']/}
         case "$t" in
-            [A-Za-z_]*=*) continue ;;
+            [A-Za-z_]*=*)
+                case "$t" in
+                    GDK_BACKEND=x11|WAYLAND_DISPLAY=) no_wayland=1 ;;
+                    DISPLAY=) no_display=1 ;;
+                    PYTHONPATH=*) pythonpath=1 ;;
+                esac
+                continue ;;
             env|*/env) wrapper=env; continue ;;
             nice|*/nice) wrapper=nice; continue ;;
-            nohup|stdbuf|exec|command|time) wrapper=other; continue ;;
+            nohup|stdbuf|exec|command|time|dbus-run-session|*/dbus-run-session) wrapper=other; continue ;;
             timeout|*/timeout) wrapper=timeout; has_timeout=1; continue ;;
-            xvfb-run|*/xvfb-run) wrapper=xvfb-run; needs_timeout=1; continue ;;
+            xvfb-run|*/xvfb-run) wrapper=xvfb-run; needs_timeout=1; on_xvfb=1; continue ;;
             sh|bash|dash|zsh|*/sh|*/bash|*/dash|*/zsh) wrapper=shell; continue ;;
             -*)
+                if [ "$wrapper" = env ]; then
+                    case "$t" in -u) u=${toks[i + 1]:-} ;; -u*) u=${t#-u} ;; --unset=*) u=${t#--unset=} ;; *) u="" ;; esac
+                    case "${u//[\"\']/}" in WAYLAND_DISPLAY) no_wayland=1 ;; DISPLAY) no_display=1 ;; esac
+                fi
                 case "$wrapper $t" in
                     "env -u"|"env -C"|"env -S"|"nice -n"|"timeout -k"|"timeout -s"|"xvfb-run -"[nsefpw]) ((i++)) ;;
                 esac
@@ -590,6 +626,51 @@ for seg in "${segs[@]}"; do
     if [ "$needs_timeout" -eq 1 ] && [ "$has_timeout" -eq 0 ]; then
         deny "wrap it in 'timeout -k 5 <seconds>' (60 for the suite or a probe, 120 for mypy), or use gates.sh; the tool's own timeout backgrounds a hang instead of surfacing it."
     fi
+
+    # Nothing reaches the user's screen. A Python run that imports mcomix opens
+    # dialogs even when it builds no window (an encrypted archive asks for its
+    # password), and wine draws where DISPLAY points. Known by the command, the
+    # script it names, or the code it passes on -c or stdin.
+    case "$word" in
+        cd)
+            d=${toks[i + 1]:-}; d=${d//[\"\']/}
+            case "$d" in /*) cdir=$d ;; ""|-*) ;; *) cdir=${cdir:-${cwd:-$REPO}}/$d ;; esac ;;
+        pytest|*/pytest|py.test|python|python3|python3.*|*/python|*/python3|*/python3.*)
+            gui=$pythonpath script="" code=1
+            case "$word" in *pytest|py.test) gui=1 code=0 ;; esac
+            for ((j = i + 1; gui == 0 && j < ${#toks[@]}; j++)); do
+                a=${toks[j]//[\"\']/}
+                case "$a" in
+                    -m) a=${toks[j + 1]:-}; a=${a//[\"\']/}; code=0
+                        case "$a" in pytest|pytest.*|mcomix|mcomix.*|test|test.*) gui=1 ;; esac; break ;;
+                    -m?*) a=${a#-m}; code=0
+                        case "$a" in pytest|pytest.*|mcomix|mcomix.*|test|test.*) gui=1 ;; esac; break ;;
+                    -c|-[A-Za-z]*c|-) break ;;
+                    -W|-X) ((j++)) ;;
+                    -*|[0-9]'<'*|[0-9]'>'*|'<'*|'>'*) ;;
+                    *) script=$a code=0; break ;;
+                esac
+            done
+            if [ "$gui" -eq 0 ] && [ "$code" -eq 1 ]; then
+                has "$raw_cmd" "$re_imports" && gui=1
+            fi
+            if [ "$gui" -eq 0 ] && [ -n "$script" ]; then
+                case "$script" in
+                    /*) ;;
+                    '~/'*) script=$HOME/${script#'~/'} ;;
+                    *) script=${cdir:-${cwd:-$REPO}}/$script ;;
+                esac
+                # A script this same command writes first is read from the command.
+                if [ -f "$script" ]; then grep -qE "$re_imports" "$script" 2>/dev/null && gui=1
+                else has "$raw_cmd" "$re_imports" && gui=1; fi
+            fi
+            if [ "$gui" -eq 1 ] && ! { [ "$no_wayland" -eq 1 ] && { [ "$on_xvfb" -eq 1 ] || [ "$no_display" -eq 1 ]; }; }; then
+                deny "a Python run that imports mcomix (the suite, a probe, a script over test/files) runs under 'env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -d -s \"-screen 0 1280x1024x24\"', even when it builds no window: an encrypted archive asks for its password in a dialog of its own, and on a Wayland desktop GTK opens on the session's compositor unless told otherwise. A sweep auditor's plain python3 once put five such dialogs on the user's screen."
+            fi ;;
+        wine|wine64|*/wine|*/wine64)
+            [ "$on_xvfb" -eq 1 ] || [ "$no_display" -eq 1 ] \
+                || deny "wine draws on the user's display: run it under 'xvfb-run -d' (the technique \"The test suite under Wine\")." ;;
+    esac
 
     for ((i = 0; i < ${#toks[@]}; i++)); do
         case "${toks[$i]}" in

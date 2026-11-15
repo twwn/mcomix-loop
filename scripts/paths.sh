@@ -54,6 +54,7 @@ EXPORT_DIR=$SCRATCH   # where `gates.sh --export` unpacks a tree; a short path o
 ISSUES_REPO=""     # owner/name whose issues the loop may write with gh; empty: none
 ISSUES_PROJECT=""  # owner/number of the GitHub project whose items it may write; empty: none
 SWEEP_EVERY=25     # commits under mcomix/ or docs/ before a lens that found nothing runs again; 0: no sweeps
+SWEEP_RETIRE=3     # empty runs in a row that retire a lens: it then rests SWEEP_EVERY commits per empty run; 0: never
 SWEEP_WIDTH=5      # auditors at once
 SWEEP_MODEL=sonnet # the model and effort of an auditor, unless the sweep names another for its lens
 SWEEP_EFFORT=high
@@ -61,6 +62,7 @@ SWEEP_FEATURES=0   # 1: a sweep may also look for what MComix lacks (the feature
 SWEEP_CALLS=40     # tool calls an auditor stops at; each reads again all the calls before it
 SWEEP_LENS_COST=7  # percent of the 5-hour window one lens takes, until sweeps.log has measured it
 WINDOW_RESERVE=10  # percent of the 5-hour window kept for finishing an iteration; past 100 minus this, nothing new starts
+WEEK_RESERVE=15    # percent of the 7-day window left to the user's own sessions; past 100 minus this, nothing new starts
 # shellcheck disable=SC1091
 [ -r "$STATE/config.sh" ] && . "$STATE/config.sh"
 
@@ -84,12 +86,13 @@ window() {
     return 0
 }
 
-# window_wake: the delaySeconds that wakes the loop a minute after the 5-hour
-# window resets, within ScheduleWakeup's 60 to 3600; 3600 when the reset is unknown.
+# window_wake [reset]: the delaySeconds that wakes the loop a minute after a
+# window resets (the 5-hour one unless another reset is given), within
+# ScheduleWakeup's 60 to 3600; 3600 when the reset is unknown.
 window_wake() {
-    local now s=3600
+    local now s=3600 r=${1:-$W_RESET}
     printf -v now '%(%s)T' -1
-    [[ "$W_RESET" =~ ^[0-9]+$ ]] && s=$((W_RESET - now + 60))
+    [[ "$r" =~ ^[0-9]+$ ]] && s=$((r - now + 60))
     [ "$s" -ge 60 ] || s=60
     [ "$s" -le 3600 ] || s=3600
     echo "$s"

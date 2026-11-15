@@ -14,6 +14,9 @@ T_MYPY=120
 # inside the tree, so an export under a long path fails every test that opens a
 # PDF ("AF_UNIX path too long"). From 3.13.6 on, 3.14 and 3.15 included, Python
 # falls back to the system's temporary directory when the path would be too long.
+# Its database tests commit to files inside the tree too, an fsync each: where an
+# fsync is slow (5.2 ms on the author's XFS, none on a tmpfs), the suite took 73 s
+# from an export there against 30 s in a checkout on a tmpfs, past T_PYTEST.
 # EXPORT_DIR=/tmp/mcomix-loop
 
 # Checkouts that other sessions own, as absolute paths. The guard refuses any
@@ -23,16 +26,20 @@ FOREIGN=()
 
 # Sweeps, when no lead can be worked (sweep.md). A lens that found nothing runs
 # again after SWEEP_EVERY commits under mcomix/ or docs/; 0 means no sweeps.
+# After SWEEP_RETIRE empty runs in a row a lens is retired: it rests SWEEP_EVERY
+# commits for each of them, and runs sooner only when you name it. 0: never.
 # SWEEP_WIDTH is the number of auditors at once, each a whole subagent's tokens.
 # SWEEP_MODEL (haiku, sonnet, opus, fable) and SWEEP_EFFORT (low, medium, high,
 # xhigh, max) are what an auditor runs at. The main thread checks every lead
 # itself, so a cheaper auditor's false leads come back as its own cost, and a lens
 # that misses what is there rests. It may name another tier for a lens of one
-# sweep, up to opus/high (sweep.md).
+# sweep, up to opus/high, and fable only where you name it for that run: a lens
+# on Fable took about three times the window a Sonnet one did (sweep.md).
 # SWEEP_FEATURES=1 lets a sweep also look for what MComix lacks, reading other
 # programs' manuals and trackers on the web. What it proposes is built only if a
 # ruling gives new features to the loop; otherwise it waits as a question.
 SWEEP_EVERY=25
+SWEEP_RETIRE=3
 SWEEP_WIDTH=5
 SWEEP_MODEL=sonnet
 SWEEP_EFFORT=high
@@ -48,7 +55,10 @@ SWEEP_CALLS=40
 # minus it, the loop starts nothing new and waits for the reset. A sweep starts
 # only the lenses that fit below it; SWEEP_LENS_COST is the percent one lens
 # takes until sweeps.log has measured it (5 to 7 on the author's plan).
+# WEEK_RESERVE is the percent of the 7-day window left to your own sessions:
+# past 100 minus it, the loop starts nothing new until the week resets.
 WINDOW_RESERVE=10
+WEEK_RESERVE=15
 SWEEP_LENS_COST=7
 
 # The only GitHub writes the guard lets through. ISSUES_REPO (owner/name):

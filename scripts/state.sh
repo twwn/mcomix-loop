@@ -3,7 +3,8 @@
 # to inject. Kept out of SKILL.md on purpose — the harness re-appends a skill's
 # whole body whenever its rendered text changes, so a state block inside the
 # skill re-bought the entire prompt every iteration. Read-only; output is meant
-# to be read once, not grepped. `state.sh usage` prints only the usage windows.
+# to be read once, not grepped. `state.sh usage` prints only the usage windows;
+# at a reserve the rest is left out unless `state.sh --full`.
 
 set -u
 case "$0" in */*) . "${0%/*}/paths.sh" ;; *) . ./paths.sh ;; esac
@@ -46,19 +47,35 @@ usage() {
         else line+="; 7-day: $W7_PCT% used, resets $(until_text "$W7_RESET")"; fi
     fi
     echo "$line; read $((W_AGE / 60)) min ago."
+    # The 7-day window first: while it is at its reserve, a 5-hour reset changes nothing.
+    if [ "$W7_PCT" != - ] && [ "$W7_PCT" -ge $((100 - WEEK_RESERVE)) ]; then
+        AT_RESERVE=1
+        echo "AT THE 7-DAY RESERVE (WEEK_RESERVE $WEEK_RESERVE%, left to the user's own sessions): start no lead, no sweep and no subagent. Finish or put aside what is in hand, end the iteration, and wake towards the reset: ScheduleWakeup delaySeconds $(window_wake "$W7_RESET"), noop true (SKILL.md, \"The 5-hour window\")."
+        return 0
+    fi
     [ "$W_PCT" != - ] || return 0
     if [ "$W_PCT" -ge $((100 - WINDOW_RESERVE)) ]; then
+        AT_RESERVE=1
         echo "AT THE RESERVE (WINDOW_RESERVE $WINDOW_RESERVE%): start no lead, no sweep and no subagent. Finish or put aside what is in hand, end the iteration, and wake at the reset: ScheduleWakeup delaySeconds $(window_wake), noop true (SKILL.md, \"The 5-hour window\")."
     else
         echo "Room: $((100 - WINDOW_RESERVE - W_PCT))% before the reserve (WINDOW_RESERVE $WINDOW_RESERVE%). Check again before each further lead: $SKILL_DIR/scripts/state.sh usage"
     fi
 }
+AT_RESERVE=""
 if [ "${1:-}" = usage ]; then usage; exit 0; fi
 
 echo "== repo: $REPO on branch $(g symbolic-ref --short -q HEAD || echo "(detached at $(g rev-parse --short HEAD))") =="
 echo "== state: $STATE (workers $WORKERS; timeouts $T_PYTEST/$T_FLAKE8/$T_MYPY s) =="
 echo "== usage =="
 usage
+# A wakeup at a reserve only waits, maybe for days on the 7-day window: the rest,
+# printed hour after hour, would fill the context with nothing to act on. A
+# cut-off iteration's record, or `--full` for a request from the user, gets it all.
+if [ -n "$AT_RESERVE" ] && [ "${1:-}" != --full ] && ! [ -s "$SCRATCH/iteration.txt" ]; then
+    echo "== the rest: not printed =="
+    echo "At the reserve this wakeup only waits: schedule the wakeup above and report one line; the notes stay as they are. A request from the user that cannot wait: $SKILL_DIR/scripts/state.sh --full"
+    exit 0
+fi
 echo "== tree =="
 st=$(g status --short)
 [ -n "$st" ] && printf '%s\n' "$st" || echo "clean"

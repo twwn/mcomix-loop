@@ -33,10 +33,13 @@ awk '
         print "Nothing on this installation yet. These notes were seeded from another installation; the gate numbers above are that checkout'"'"'s, and the leads below were true there. Re-baseline the gates on a clean tree, then rewrite this file as your own."
         print ""; keep = 0; next
     }
+    /^## /                             { skip = 0 }
     /^## Leads worth picking up/       { keep = 1 }
     /^## Prompt corrections/           { print; print ""; print "None."; keep = 0; next }
-    keep && /^[[:space:]]+(Loop:|Checkout:|This machine:|Published release )/ { next }   # one checkout, not a gate number
-    keep && /^Quiet iterations:/ { print "Quiet iterations: 0"; next }   # a fresh chain has counted nothing, and has no sweep open
+    keep && /^[[:space:]]+(Loop:|Checkout:|This machine:|Published release |Export gate:)/ { next }   # one checkout, not a gate number
+    # The count ends the gate numbers; what the loop wrote below it is about its own runs.
+    keep && /^Quiet iterations:/ { print "Quiet iterations: 0"; print ""; skip = 1; next }   # a fresh chain has counted nothing, and has no sweep open
+    skip { next }
     keep { print }
 ' "$NOTES" > "$BASE/notes.md"
 
@@ -44,8 +47,10 @@ awk '
 grep -rlF "$HOME" "$BASE" --include='*.md' 2>/dev/null | while read -r f; do sed -i "s|$HOME\b|/home/<user>|g" "$f"; done
 
 $OKF --state "$BASE" index >/dev/null
+# The MComix commit the notes measured at, not this repository's.
+commit=$(sed -nE 's/^## Gate numbers as of ([0-9a-f]{7,40}).*/\1/p' "$NOTES" | head -1)
 repo=$(resolve_repo 2>/dev/null)
-commit=$(git -C "${repo:-.}" rev-parse --short HEAD 2>/dev/null || echo unknown)
+[ -n "$commit" ] || commit=$(git -C "${repo:-.}" rev-parse --short HEAD 2>/dev/null || echo unknown)
 today=$(date -u +%F)
 {
     if [ -e "$BASE/log.md" ]; then sed -n '1,2p' "$BASE/log.md"; else printf '# Update log\n\n'; fi
