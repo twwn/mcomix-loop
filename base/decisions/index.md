@@ -90,3 +90,5 @@
 * [A release request first checks the loop's notes](2026-11-01-a-release-request-first-checks-the-loop-s-notes.md) - unconfirmed
 * [The user orders a release, the loop writes its commit](2026-11-03-the-user-orders-a-release-the-loop-writes-its.md) - unconfirmed
 * [A package the loop needs installed goes into the notes for the user](2026-11-07-a-package-or-tool-the-loop-needs-installed-is.md) - unconfirmed
+* [A sweep's auditors run on Sonnet unless the user names Fable for a given lens and run](2026-11-15-a-sweep-s-auditors-run-on-sonnet-unless-the.md) - unconfirmed, replaced
+* [A sweep's lenses run on Fable only where the user names it; the loop may still raise one to opus/high](2026-11-15-a-sweep-s-lenses-run-on-fable-only-where-the.md) - unconfirmed

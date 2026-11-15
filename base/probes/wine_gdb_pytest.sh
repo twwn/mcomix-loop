@@ -1,6 +1,11 @@
 #!/bin/sh
 # wine_pytest.sh under MSYS2's gdb.exe: a C backtrace at a crash. Usage as wine_pytest.sh;
 # gdb joins the arguments into one, so pass several node ids as @<file> (pytest reads it).
+# On a display of its own: Wine draws on whatever DISPLAY names, and a
+# window it opened came up on the user's screen (2026-11-15).
+if [ -z "$WINE_PROBE_ON_XVFB" ]; then
+	exec env -u WAYLAND_DISPLAY WINE_PROBE_ON_XVFB=1 xvfb-run -d -s "-screen 0 1280x1024x24" sh "$0" "$@"
+fi
 STATE=${MCOMIX_STATE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 W=$STATE/scratch/wine
 winpath() { printf 'Z:%s' "$1" | tr / '\\'; }

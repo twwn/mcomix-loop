@@ -20,6 +20,7 @@
 * [Sweeps that found work](sweeps-that-found-work.md)
 * [The Flatpak: building it here, and running it in its sandbox](the-flatpak-building-and-running-it-here.md)
 * [The GitHub CI: reading its results, reproducing its jobs](the-github-ci-reading-its-results-reproducing.md)
+* [The session bus in a test: a private daemon and a stand-in service](the-session-bus-in-a-test-a-private-daemon-and-a.md)
 * [The shell is zsh](the-shell-is-zsh.md)
 * [Warnings: the suite's and GTK's](warnings-the-suite-s-and-gtk-s.md)
 * [Workflow changes: zizmor, commit pins, and what the runners lack](workflow-changes-zizmor-pins-and-what-the-runners-lack.md)

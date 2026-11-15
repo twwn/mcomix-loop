@@ -6,7 +6,8 @@ sources:
   - { resource: "repo:test/test_library_dialog.py" }
   - { resource: "repo:test/test_book_area.py" }
   - { resource: "repo:test/test_main_window.py" }
-generated: { by: mcomix-loop/claude, at: "2026-09-23T17:38:52+02:00" }
+  - { resource: "repo:test/test_collection_area.py" }
+generated: { by: mcomix-loop/claude-opus-5-5, at: "2026-11-08T12:00:00Z" }
 ---
 
 - **`test_library_dialog.py:_OneBookTest` is the real library with one book shown under "All books"**; subclass it rather than the stubs in test_book_area.py when what is tested crosses the book area, the control area and the backend. `_left_on(page)` writes the recent row (last page = finished). Select a cover with `book_area._covers.select_only(0)` and pump; the info line is `control_area._namelabel/_filelabel/_dirlabel`.
@@ -18,3 +19,4 @@ generated: { by: mcomix-loop/claude, at: "2026-09-23T17:38:52+02:00" }
 - **To catch the covers mid-drawing, hold the worker on an event, not a sleep, and only briefly** (test_library_dialog.py OpenFromLibraryTest): wrap `book_area._covers.generate_thumbnail` in a function that waits on a `threading.Event` for at most a second. Anything that redraws the covers (`set_items`, `clear`, a book opened and written to "Recent") calls `stop_update()`, which joins the worker, so a long hold becomes a stall of the main thread: at 5 s the test passed but took 5 s, one run in six under -n 8.
 - **Adding every archive in test/files/archives to the library hangs**: the encrypted ones ask for a password on the main thread. Filter out names containing "ncrypt" or "assword".
 - **A "Save and quit" resume is tested by two windows in one test** (test_main_window.py ResumeAfterSaveAndQuitTest): set the preference, `window.write_config_files()`, close the window, and build a second `MainWindow()` with no path.
+- **The collection sidebar (test_collection_area.py) finds a row by `ColumnListView.row_at(x, y)`, which picks a `_Cell`; at x 10 the pick lands on the tree expander, which is above the cell, and answers None.** `_middle_of()` gives x 10 for drops (drop_at works there); a right click needs x past the expander, e.g. 60, and the test should assert `row_at()` finds the row first. A real right click needs no selection of its own: since 9f13cff4 `_button_press` selects the row, as the cover list does, so the menu acts on the row clicked.

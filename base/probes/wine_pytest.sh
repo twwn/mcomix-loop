@@ -21,7 +21,11 @@ export PYTHONDONTWRITEBYTECODE=1
 cd "$W/tree" || exit 2
 unset GDK_BACKEND
 wineserver -k 2>/dev/null
-wine "$W/msys/root/ucrt64/bin/python3.exe" -m pytest -p no:cacheprovider "$@"
+# On a display of its own: Wine draws on whatever DISPLAY names, and a
+# test that shows a window showed it on the user's screen (2026-11-15).
+unset WAYLAND_DISPLAY
+xvfb-run -d -s "-screen 0 1280x1024x24" \
+	wine "$W/msys/root/ucrt64/bin/python3.exe" -m pytest -p no:cacheprovider "$@"
 status=$?
 wineserver -k 2>/dev/null
 exit $status
