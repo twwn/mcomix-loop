@@ -112,6 +112,9 @@ def main():
             row.append('%d:%.2fs' % (threads, best))
         print('%-10s %-16s' % (kind, handler), ' '.join(row), flush=True)
     sys.stdout.flush()
+    # os._exit skips atexit: the PDF reader's /tmp/pymp-* stayed.
+    import atexit
+    atexit._run_exitfuncs()
     os._exit(0)
 
 

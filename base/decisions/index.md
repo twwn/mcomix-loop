@@ -66,6 +66,15 @@
 * [The KFX reader stays clean-room](2026-11-03-the-kfx-reader-stays-clean-room.md) - unconfirmed
 * [The Windows packages carry one MComix executable, without a console](2026-11-03-the-windows-packages-carry-one-mcomix.md) - unconfirmed
 * [What a delete takes with it](2026-11-03-what-a-delete-takes-with-it.md) - unconfirmed
+* [Ctrl+F searches the covers the main window shows while no book is open](2026-11-17-ctrl-f-searches-the-covers-the-main-window.md) - unconfirmed
+* [In the library, Ctrl+Enter opens a book as if it were opened directly](2026-11-17-in-the-library-ctrl-enter-opens-a-book-as-if-it.md) - unconfirmed
+* [Library covers are drawn without the white frame](2026-11-17-library-covers-are-drawn-without-the-white-frame.md) - unconfirmed, replaced
+* [Library covers are stored at the cover size times the screen scale](2026-11-17-library-covers-are-stored-at-the-cover-size.md) - unconfirmed
+* [The frame around thumbnails and library covers has a width the reader sets, 0 for none](2026-11-17-the-frame-round-thumbnails-and-library-covers.md) - unconfirmed
+* [The library's own cover store is saved as WebP or AVIF, whichever serves better](2026-11-17-the-library-s-own-cover-store-is-saved-as-webp.md) - unconfirmed
+* [The main window's shelf of covers has no heading row](2026-11-17-the-main-window-s-shelf-of-covers-has-no.md) - unconfirmed
+* [Hiding the pointer and the Leave fullscreen button after the mouse rests is a preference, with a settable delay](2026-11-18-hiding-the-pointer-and-the-leave-fullscreen.md) - unconfirmed, replaced
+* [Once the mouse rests, the pointer and the Leave fullscreen button hide after a delay the reader sets, 0 for never](2026-11-18-how-long-the-pointer-and-the-leave-fullscreen.md) - unconfirmed
 
 ## How this installation works
 
@@ -91,4 +100,5 @@
 * [The user orders a release, the loop writes its commit](2026-11-03-the-user-orders-a-release-the-loop-writes-its.md) - unconfirmed
 * [A package the loop needs installed goes into the notes for the user](2026-11-07-a-package-or-tool-the-loop-needs-installed-is.md) - unconfirmed
 * [A sweep's auditors run on Sonnet unless the user names Fable for a given lens and run](2026-11-15-a-sweep-s-auditors-run-on-sonnet-unless-the.md) - unconfirmed, replaced
-* [A sweep's lenses run on Fable only where the user names it; the loop may still raise one to opus/high](2026-11-15-a-sweep-s-lenses-run-on-fable-only-where-the.md) - unconfirmed
+* [A sweep's lenses run on Fable only where the user names it; the loop may still raise one to opus/high](2026-11-15-a-sweep-s-lenses-run-on-fable-only-where-the.md) - confirmed
+* [Optimizing and refactoring is a standing order, paused after three fruitless attempts in a row](2026-11-18-optimizing-and-refactoring-is-a-standing-order.md) - unconfirmed

@@ -3,6 +3,7 @@
 ## Running, testing, probing
 
 * [A slow cover - how to build one and time the wait](a-slow-cover-how-to-build-one-and-time-the-wait.md)
+* [A test that passes here and fails in the CI: floors, Windows, a slower runner](a-test-that-passes-here-and-fails-in-the-ci.md)
 * [Checking what the port changed](checking-what-the-port-changed.md)
 * [Comment-only commits, proven by AST](comment-only-commits-proven-by-ast.md)
 * [Counting redraws over a pump: late pages and resizes land there too](counting-redraws-over-a-pump-late-pages-and-resizes.md)
@@ -10,7 +11,9 @@
 * [DjVu documents in a test: c44, djvm, ddjvu](djvu-documents-in-a-test-c44-djvm-ddjvu.md)
 * [Flakes: make the rare case common](flakes-make-the-rare-case-common.md)
 * [Fuzzing the readers with Atheris](fuzzing-the-readers-with-atheris.md)
+* [GTK list focus moves only in the active window; xdist workers share one Xvfb](gtk-list-focus-moves-only-in-the-active-window.md)
 * [KFX books: built by the tests, the clean room, JPEG XR](kfx-books-built-by-the-tests-clean-room-and-jpeg-xr.md)
+* [Library covers at a start - how to time them](library-covers-at-a-start-how-to-time-them.md)
 * [Private names and dead code: AST sweeps](private-names-and-dead-code-ast-sweeps.md)
 * [Probes](probes.md)
 * [Property checks for pure code](property-checks-for-pure-code.md)
@@ -35,6 +38,8 @@
 * [A worker that aborts inside GTK](a-worker-that-aborts-inside-gtk.md)
 * [Dialogs and widgets that outlive their window](dialogs-and-widgets-that-outlive-their-window.md)
 * [Gio.File.trash() refuses bind mounts and tmpfs: checking without touching the user's trash](gio-trash-refuses-bind-mounts-and-tmpfs.md)
+* [GTK list focus moves only in the active window; xdist workers share one Xvfb](gtk-list-focus-moves-only-in-the-active-window.md)
+* [GTK list views keep a cell only for the same item object, and their scroll anchor with it](gtk-list-views-keep-a-cell-only-for-the-same-item.md)
 * [GTK reference counts, from Python](gtk-reference-counts-from-python.md)
 * [GTK's own documentation, offline](gtk-s-own-documentation-offline.md)
 * [GTK's renderer under Xvfb](gtk-s-renderer-under-xvfb.md)
@@ -48,6 +53,7 @@
 * [The file chooser in a test](the-file-chooser-in-a-test.md)
 * [The frame after a page turn: read the page area, not the scroll bars](the-frame-after-a-page-turn-read-the-page-area.md)
 * [The recently-used list in a probe](the-recently-used-list-in-a-probe.md)
+* [The suite draws plain GTK: libadwaita's look shows only after theme.follow_theme()](the-suite-draws-plain-gtk-libadwaita-s-look-needs-follow-theme.md)
 * [Threads that share one thing](threads-that-share-one-thing.md)
 * [Which thread reaches something, across the whole suite](which-thread-reaches-something-across-the-whole.md)
 
@@ -55,6 +61,7 @@
 
 * [A cold page turn](a-cold-page-turn.md)
 * [A collection's covers include the collections under it](a-collection-s-covers-include-the-collections.md)
+* [A library of 10,000 books, timed](a-library-of-10000-books-timed.md)
 * [A page is listed before its file is there](a-page-is-listed-before-its-file-is-there.md)
 * [A page turn, timed and profiled](a-page-turn-timed-and-profiled.md)
 * [A slow cover - how to build one and time the wait](a-slow-cover-how-to-build-one-and-time-the-wait.md)
@@ -72,6 +79,7 @@
 * [File URIs and content types: GLib's, never urllib's or mimetypes'](file-uris-and-content-types-glib-s-never-urllib.md)
 * [Forward-compatible stores: what an older MComix reads](forward-compatible-stores-what-an-older-mcomix.md)
 * [gdk-pixbuf through glycin: what a call costs](gdk-pixbuf-through-glycin-what-a-call-costs.md)
+* [Library covers at a start - how to time them](library-covers-at-a-start-how-to-time-them.md)
 * [Library writes from the UI: two statements a book is seconds on disk](library-writes-from-the-ui-two-statements-a.md)
 * [Names and text from other systems: zip names, encodings, owners](names-and-text-from-other-systems-zip-names.md)
 * [Package channels: what each accepts, and which credential it needs](package-channels-what-each-accepts-and-which-credential.md)
@@ -79,6 +87,7 @@
 * [Scaling quality: measuring moiré, and Pillow's pass order](scaling-quality-measuring-moire-and-pillow-s-pass-order.md)
 * [Sorts that leave ties to the listing order](sorts-that-leave-ties-to-the-listing-order.md)
 * [Start-up import time: -X importtime, and what is left](start-up-import-time-x-importtime-and-what-is-left.md)
+* [Stored covers: picture formats measured (PNG, WebP, AVIF, JPEG, JXL)](stored-covers-picture-formats-measured.md)
 * [Text a reader typed, used as a pattern](text-a-reader-typed-used-as-a-pattern.md)
 * [The dynamic background colour: benchmark and test page](the-dynamic-background-colour-benchmark-and.md)
 * [The library window in a test: covers, drops and scans](the-library-window-in-a-test-covers-drops-and.md)

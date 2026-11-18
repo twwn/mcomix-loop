@@ -1,6 +1,6 @@
 """Time image_tools.get_most_common_edge_colour() on real pages.
 
-Usage: timeout -k 5 60 xvfb-run -a python3 bench_edge_colour.py <mcomix tree> <image>...
+Usage: xvfb-run -a timeout -k 5 60 python3 bench_edge_colour.py <mcomix tree> <image>...
 Prints the median of 30 calls per image, one and two pages, in ms.
 """
 import statistics

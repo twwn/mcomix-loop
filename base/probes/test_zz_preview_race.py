@@ -6,7 +6,7 @@ removes the folder alongside the test's own removal.  Python 3.12 only: from
 3.13 on rmtree ignores an entry that vanished.
 
 Run from the checkout, with the floors venv:
-PYTHONPATH=. env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 280 xvfb-run -d \
+PYTHONPATH=. env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -d timeout -k 5 280 \
     STATE/scratch/floorsenv/bin/python -m pytest -c test/pytest.ini --rootdir=. \
     STATE/probes/test_zz_preview_race.py -q -p no:warnings
 

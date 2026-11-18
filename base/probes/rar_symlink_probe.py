@@ -1,7 +1,7 @@
 """What the UnRAR library does with symlink members MComix hands it.
 
 Run from the checkout:
-env -u WAYLAND_DISPLAY GDK_BACKEND=x11 PYTHONPATH=. timeout -k 5 60 xvfb-run -d \
+env -u WAYLAND_DISPLAY GDK_BACKEND=x11 PYTHONPATH=. xvfb-run -d timeout -k 5 60 \
     python3 <this file>
 
 Hand-built RAR 4: a member whose attribute word holds S_IFLNK and HostOS is
