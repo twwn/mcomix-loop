@@ -362,7 +362,29 @@ check_git() {   # $@: the tokens after 'git'; $flat is in scope
         worktree)
             case "$args" in
                 *" remove "*)
-                    [[ "$flat" == *".claude/worktrees/campaign"* ]] || deny "git worktree remove: only the loop's own worktrees under $REPO/.claude/worktrees/campaign* are its to remove." ;;
+                    # The loop's own: under .claude/worktrees/, on a loop/* branch -
+                    # a campaign's, or a subagent's stream of commits that were
+                    # cherry-picked onto the branch. Other sessions put worktrees
+                    # there too (EnterWorktree), on branches of their own.
+                    local wt="" seen=0 own_wt="only the loop's own worktrees, under $REPO/.claude/worktrees/ with a loop/* branch checked out, are its to remove"
+                    for tok in "$@"; do
+                        case "$tok" in
+                            remove) seen=1 ;;
+                            -*) ;;
+                            *) [ "$seen" -eq 1 ] && { wt=$tok; break; } ;;
+                        esac
+                    done
+                    case "$wt" in /*) ;; *) wt=${git_dir:-$HERE}/$wt ;; esac
+                    while [[ "$wt" == */ ]]; do wt=${wt%/}; done
+                    while [[ "$wt" == *"/./"* ]]; do wt=${wt//\/.\//\/}; done
+                    case "$wt" in
+                        "$REPO"/.claude/worktrees/*/*|*/../*) deny "git worktree remove $wt: $own_wt." ;;
+                        "$REPO"/.claude/worktrees/?*) ;;
+                        *) deny "git worktree remove $wt: $own_wt." ;;
+                    esac
+                    git -C "$REPO" worktree list --porcelain 2>/dev/null \
+                        | awk -v w="worktree $wt" '$0 == w { f = 1; next } /^worktree / { f = 0 } f && /^branch refs\/heads\/loop\// { ok = 1 } END { exit !ok }' \
+                        || deny "git worktree remove $wt: $own_wt." ;;
                 *" prune "*|*" move "*|*" lock "*|*" unlock "*|*" repair "*)
                     deny "git worktree: worktrees you did not create are not yours to touch (prune/move/lock/unlock/repair)." ;;
             esac ;;
@@ -542,7 +564,7 @@ re_shell_c='(^|[[:space:]])xvfb-run[[:space:]].*[[:space:]](sh|bash|dash|zsh)[[:
 re_nowayland='GDK_BACKEND=x11|(^|[[:space:]])-u[[:space:]]*WAYLAND_DISPLAY|--unset=WAYLAND_DISPLAY|(^|[[:space:]])WAYLAND_DISPLAY=([[:space:]]|$)'
 # What a Python run imports that opens dialogs and windows: mcomix, or the test
 # package that builds on it.
-re_imports="(^|[^A-Za-z0-9_.])(import|from)[[:space:]]+(mcomix|test)([.[:space:],;]|\$)|(import_module|__import__)\\([\"'](mcomix|test)"
+re_imports="(^|[^A-Za-z0-9_.])(import|from)[[:space:]]+(mcomix|test)([.[:space:],;\"']|\$)|(import_module|__import__)\\([\"'](mcomix|test)"
 for seg in "${segs[@]}"; do
     # Words as the shell passes them on, quotes removed: `bash -c 'git push'`
     # runs git, and `git add '*'` stages everything.
@@ -604,7 +626,11 @@ for seg in "${segs[@]}"; do
                 esac
                 [ -n "$wrapper" ] && continue ;;
             *)
-                if [ "$wrapper" = timeout ] && [[ "$t" =~ ^[0-9.]+[smhd]?$ ]]; then wrapper=other; continue; fi ;;
+                if [ "$wrapper" = timeout ] && [[ "$t" =~ ^[0-9.]+[smhd]?$ ]]; then wrapper=other; continue; fi
+                # The rest of -s "-screen 0 1280x1024x24 +extension GLX" where its
+                # quotes were kept, inside a shell's -c: not the command xvfb-run
+                # starts, which is never a number or in capitals.
+                if [ "$wrapper" = xvfb-run ] && [[ "$t" =~ ^(\+.*|[0-9]+(x[0-9]+)*|[A-Z][A-Z0-9_-]*)$ ]]; then continue; fi ;;
         esac
         break
     done
@@ -624,7 +650,7 @@ for seg in "${segs[@]}"; do
             done ;;
     esac
     if [ "$needs_timeout" -eq 1 ] && [ "$has_timeout" -eq 0 ]; then
-        deny "wrap it in 'timeout -k 5 <seconds>' (60 for the suite or a probe, 120 for mypy), or use gates.sh; the tool's own timeout backgrounds a hang instead of surfacing it."
+        deny "wrap it in 'timeout -k 5 <seconds>' (60 for the suite or a probe, 120 for mypy), under xvfb-run directly before the Python run, so that xvfb-run cleans up after a hang; or use gates.sh. The tool's own timeout backgrounds a hang instead of surfacing it."
     fi
 
     # Nothing reaches the user's screen. A Python run that imports mcomix opens

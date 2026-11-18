@@ -7,6 +7,11 @@ WORKERS=8        # pytest-xdist workers. Measure: -n auto is slower on a suite t
 T_PYTEST=60      # seconds, the suite and any probe; a hang is reported as HUNG
 T_FLAKE8=60
 T_MYPY=120
+# gates.sh runs the test files a change touches twice more: under the floors venv
+# (FLOORS_PYTHON, default state/scratch/floorsenv/bin/python), and SLOW_RUNS (3)
+# times on two processors under SLOW_WORKERS (4) workers, at most GATE_CHUNK (8)
+# files a run, each run inside T_PYTEST.
+# GATE_CHUNK=8
 
 # Where `gates.sh --export` unpacks a clean tree (default: state/scratch/).
 # On Python 3.12, and 3.13 before 3.13.6, the forkserver listens on a socket file

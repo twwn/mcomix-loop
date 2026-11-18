@@ -141,7 +141,7 @@ to the next, and the shell is zsh.
    showed.
    Everything runs in the foreground inside `timeout -k 5 <seconds>`. A subset of
    the suite, never all of it:
-   `env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 60 xvfb-run -d -s "-screen 0 1280x1024x24" python3 -m pytest test/<file> -q -n 2`
+   `env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -d -s "-screen 0 1280x1024x24" timeout -k 5 60 python3 -m pytest test/<file> -q -n 2`
 4. **Stop** at five leads or {CALLS} tool calls, whichever comes first, and count
    them. Each call reads again all that came before it, so the late ones cost the
    most, and what an auditor spends the loop cannot spend on its leads. Calls that

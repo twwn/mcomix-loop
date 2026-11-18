@@ -301,9 +301,9 @@ Everything below is judgment the guard cannot make.
 **Other sessions share this repository.** The user commits by hand while
 iterations run. Worktrees you did not create, and branches they have checked
 out, are not yours: in the worktree list from `state.sh` everything outside
-`.claude/worktrees/` is someone else's (`FOREIGN` in `STATE/config.sh` lists
-the ones the guard refuses outright; another one is a question for the
-user).
+`.claude/worktrees/` is someone else's, and so is one inside it whose branch
+is not `loop/*` (`FOREIGN` in `STATE/config.sh` lists the ones the guard
+refuses outright; another one is a question for the user).
 
 **Nothing may touch the user's real data.** `mcomix/constants.py` resolves
 `CONFIG_DIR`, `DATA_DIR` and the paths derived from them at import time, so
@@ -351,8 +351,10 @@ the symptom is a suite that never prints its summary while each file passes
 on its own.
 
 **Leaving the GTK main loop does not end the process.** MComix' worker threads
-are not daemons; only `terminate_program()` stops them. A probe flushes stdout
-and calls `os._exit(0)` when it is done.
+are not daemons; only `terminate_program()` stops them. A probe flushes stdout,
+runs `import atexit; atexit._run_exitfuncs()` and calls `os._exit(0)` when it
+is done. `os._exit` alone skips atexit, which removes `test/tmp/session.*` and
+multiprocessing's `/tmp/pymp-*`: 411 and 55 of them were left by probes.
 
 **A benchmark does not outlast what it measures.** One `xvfb-run`, one
 process, the whole matrix inside it; poll for a condition, never sleep. **No
@@ -429,7 +431,7 @@ on `LOOP_NOTES` is exactly why it exists.
 
 ## Verification gates
 
-All three, before every commit, by one command:
+All of them, before every commit, by one command:
 `${CLAUDE_SKILL_DIR}/scripts/gates.sh [pytest|static|deprecations]
 [--tree <dir>] [--export[=<rev>]]`. It prints one line per gate and leaves
 the full logs in `SCRATCH/pytest.txt`, `flake8.txt` and `mypy.txt` (for a
@@ -438,11 +440,21 @@ names the directory); `deprecations` lists the `DeprecationWarning` names the
 last suite run reached. What it runs, for probes that need a variant:
 
 ```sh
-env -u WAYLAND_DISPLAY GDK_BACKEND=x11 timeout -k 5 60 \
-    xvfb-run -d -s "-screen 0 1280x1024x24" python3 -m pytest test/ -q -n 8
+env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -d -s "-screen 0 1280x1024x24" \
+    timeout -k 5 60 python3 -m pytest test/ -q -n 8
 timeout -k 5 60  python3 -m flake8 --select=F mcomix/ test/   # must be silent
 timeout -k 5 120 python3 -m mypy mcomix                        # must report no issues
 ```
+
+After the suite, the test files the change touches run twice more, where the
+CI has failed tests that passed here: under the floors venv
+(`STATE/scratch/floorsenv`, the oldest libraries MComix supports), and three
+times on two processors under four workers, the CI runner's timing. The
+touched files are those changed in the tree; in a clean tree, those `HEAD`
+changed; in an export, those of the exported revision. At most eight go into
+one run, each run inside `T_PYTEST`. The `floors:` and `slow:` lines are gates
+like the others; `floors: SKIPPED` means the venv is missing, and the
+technique "A test that passes here and fails in the CI" rebuilds it.
 
 Run outside `xvfb-run`, the suite hangs rather than failing. The screen is
 the CI's: `xvfb-run`'s own default is smaller (640x480 here), a window is as
@@ -484,8 +496,10 @@ else differs.
 **Timeouts:** `T_PYTEST` (60 s) for the suite and any probe, `T_MYPY` (120
 s) for mypy, from `STATE/config.sh`, as `timeout -k 5 <seconds>` inside the
 command — the Bash tool's own timeout backgrounds an overrun instead of
-killing it, which hides a hang. A hang (124) is itself a finding. Foreground
-only, never `run_in_background`.
+killing it, which hides a hang. Under `xvfb-run` the timeout goes after it,
+directly before the Python run: `xvfb-run` has no trap, so one killed from
+outside leaves its `/tmp/xvfb-run.*` behind. A hang (124) is itself a finding.
+Foreground only, never `run_in_background`.
 
 ## Commits
 
@@ -675,6 +689,15 @@ such as several views over one model, stay in one thread. A subagent with
 start a unit from the campaign branch, make its worktree yourself —
 `git worktree add -b loop/<campaign>-<unit> .claude/worktrees/campaign-<unit>
 loop/<campaign>` — and name the path in its task.
+
+Outside a campaign, where the user lets subagents share a lead, each works a
+stream of commits in a worktree the loop makes from `BRANCH`:
+`git worktree add -b loop/<stream> .claude/worktrees/<stream> BRANCH`. Its
+commits come over by `git cherry-pick` once it is done, and the gates run on
+`BRANCH` over them. Once all of them are on it, the stream is removed:
+`git worktree remove .claude/worktrees/<stream> && git branch -D
+loop/<stream>`. The guard lets the loop remove only a worktree under
+`.claude/worktrees/` that has a `loop/*` branch checked out.
 
 ## Reporting
 
